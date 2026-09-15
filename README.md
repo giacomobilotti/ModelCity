@@ -159,8 +159,4 @@ conversion, metrics, plotting, and integration with the included examples.
 
 ## Citation, license, and contact
 
-Project citation details and a repository URL have not yet been specified.
-Add them here before a public release.
-
-The package metadata currently declares the MIT license. A standalone
-`LICENSE` file should be added before distribution.
+TBA
