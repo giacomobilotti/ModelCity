@@ -23,10 +23,3 @@ settlement tables and applying a common set of metrics and plots.
 The Yautepec and Viabundus datasets are demonstrations of the adapter pattern.
 They are not the organizing model for this documentation or a requirement for
 using the package.
-
-## Future documentation site
-
-This page is designed to become the `index.md` landing page for MkDocs.
-The current filenames and relative links can be retained if a site is added.
-A future `mkdocs.yml` should use the navigation order shown above and can add
-API generation from the existing source docstrings through mkdocstrings.
