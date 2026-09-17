@@ -42,7 +42,14 @@ ModelCity requires Python 3.9 or newer. From the repository root:
 python3 -m pip install -e .
 ```
 
-Install the test tools and optional coordinate conversion support with:
+Install the test tools with:
+
+```bash
+python3 -m pip install -e ".[dev]"
+```
+
+The optional `geo` extra installs `pyproj`, which the Viabundus demo loader in
+`scripts/run_unified.py` uses for region assignment:
 
 ```bash
 python3 -m pip install -e ".[dev,geo]"
@@ -118,23 +125,17 @@ See [Adapting datasets](docs/adapting-datasets.md) for complete mapping recipes.
 
 ## Included demonstrations
 
-Two convenience readers demonstrate how source-specific loading stays separate
-from the shared analysis:
-
-```python
-yautepec = mc.read_yautepec("data/examples/yautepec.csv")
-viabundus = mc.read_viabundus("data/examples/viabundus.csv")
-```
-
-Regenerate the comparable example figures and tables with:
+Source-specific loaders for the example CSVs live in
+[`scripts/run_unified.py`](scripts/run_unified.py), not in the package. They
+map each table through `as_settlements()`, then the script applies the same
+seven plotting calls to both datasets.
 
 ```bash
 python3 scripts/run_unified.py
-python3 scripts/run_unified.py --dataset yautepec --years BCAD
+python3 scripts/run_unified.py --dataset yautepec
 ```
 
-The same seven plotting calls are applied after each reader has produced a
-`Settlements` object.
+Figures and tables are written under `figures/<dataset>/unified/`.
 
 ## Repository layout
 

@@ -226,17 +226,19 @@ def read_my_dataset(path, **overrides):
 The reader should perform source-specific repair and metadata declaration only.
 Keep metrics and plotting in shared code.
 
-## Included readers as examples
+## Included adapters as examples
 
-[`read_yautepec()`](../src/modelcity/readers.py) maps an interval table with
-areas in hectares and BP dates.
+[`scripts/run_unified.py`](../scripts/run_unified.py) contains the project
+adapters for the example CSVs. They are not part of the modelcity package.
 
-[`read_viabundus()`](../src/modelcity/readers.py) demonstrates a more involved
-snapshot reader: it repairs an R-exported CSV, parses coordinates, optionally
-converts them with `pyproj`, scales populations from thousands, and then calls
-the same `as_settlements()` constructor.
+`read_yautepec()` maps an interval table with areas in hectares and BP dates.
 
-These readers illustrate adapter patterns; neither schema is privileged by the
+`read_viabundus()` demonstrates a more involved snapshot adapter: it repairs an
+R-exported CSV, parses coordinates, optionally converts them with `pyproj`
+(via the `geo` extra), scales populations from thousands, and then calls the
+same `as_settlements()` constructor.
+
+These adapters illustrate the pattern; neither schema is privileged by the
 core package.
 
 After adapting a source, follow the [end-to-end workflow](workflow.md) and the

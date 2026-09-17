@@ -20,6 +20,6 @@ settlement tables and applying a common set of metrics and plots.
 
 - [Legacy R and Quarto workflows](legacy-r-workflows.md)
 
-The Yautepec and Viabundus datasets are demonstrations of the adapter pattern.
-They are not the organizing model for this documentation or a requirement for
-using the package.
+The Yautepec and Viabundus datasets are demonstrations of the adapter pattern
+(see [`scripts/run_unified.py`](../scripts/run_unified.py)). They are not the
+organizing model for this documentation or a requirement for using the package.

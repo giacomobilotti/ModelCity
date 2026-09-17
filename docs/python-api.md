@@ -72,21 +72,10 @@ Properties and methods:
 - `OPTIONAL_ROLES`: `end`, `name`, `group`;
 - `ALL_ROLES`: required and optional roles together.
 
-## Convenience readers
-
-### `read_yautepec(path, **kwargs)`
-
-Example adapter for interval records containing site area in hectares and BP
-dates. Keyword overrides are forwarded to `as_settlements()`.
-
-### `read_viabundus(path, assign_region=True, **kwargs)`
-
-Example adapter for snapshot populations stored in thousands. It also repairs
-the source's R-style CSV geometry representation and can assign approximate
-regions when the optional `geo` dependency is installed.
-
-These are source-specific examples. New datasets should normally use
-`as_settlements()` directly or define a similarly thin adapter.
+Source-specific adapters for the repository example CSVs live in
+[`scripts/run_unified.py`](../scripts/run_unified.py), not in the package API.
+New datasets should use `as_settlements()` directly or define a similarly thin
+adapter outside the library.
 
 ## Metrics
 

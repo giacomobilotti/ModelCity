@@ -217,8 +217,9 @@ def analyze(settlements, output):
 
 This boundary makes adding another dataset a small loader change rather than a
 copy of the analytical code. The included
-[`scripts/run_unified.py`](../scripts/run_unified.py) demonstrates that pattern
-with two loaders and one shared set of metrics and plots.
+[`scripts/run_unified.py`](../scripts/run_unified.py) keeps those loaders
+outside the package and demonstrates the pattern with two adapters and one
+shared set of metrics and plots.
 
 ## Assumptions to report
 

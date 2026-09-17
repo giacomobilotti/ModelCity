@@ -150,13 +150,13 @@ metadata differ between environments.
 ## Included reproducible demonstration
 
 [`scripts/run_unified.py`](../scripts/run_unified.py) loads each included
-example through a source-specific adapter and applies one shared set of seven
-plots and four exported metric tables:
+example through a source-specific adapter (defined in that script, not in the
+package) and applies one shared set of seven plots and four exported metric
+tables:
 
 ```bash
 python3 scripts/run_unified.py
 python3 scripts/run_unified.py --dataset viabundus
-python3 scripts/run_unified.py --years BCAD
 ```
 
 Outputs are written under:

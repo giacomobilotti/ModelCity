@@ -17,10 +17,9 @@ from modelcity import (
     plot_size_summary,
     plot_size_totals,
     plot_urban_share,
-    read_viabundus,
-    read_yautepec,
     year_display,
 )
+from run_unified import read_viabundus, read_yautepec
 
 PLOTS = [
     plot_duration,

@@ -4,17 +4,20 @@ The package standardises any settlement table into one canonical shape, then
 computes the same set of summaries and figures from it, whether size is measured
 as an area in hectares or as a population count.
 
-    >>> from modelcity import read_yautepec, plot_duration
-    >>> sites = read_yautepec("data/examples/yautepec.csv")
+    >>> import pandas as pd
+    >>> from modelcity import as_settlements, plot_duration
+    >>> frame = pd.DataFrame(
+    ...     {"Sitio": ["A"], "Area": [1.0], "start": [3449], "end": [3050]}
+    ... )
+    >>> sites = as_settlements(
+    ...     frame, id="Sitio", size="Area", start="start", end="end",
+    ...     size_type="area", time_scale="BP",
+    ... )
     >>> fig = plot_duration(sites)
 
-Datasets other than the two shipped readers go through ``as_settlements``, which
-maps your column names onto the canonical roles:
-
-    >>> cities = as_settlements(
-    ...     frame, id="Nodes_ID", size="Inhabitants", start="Year",
-    ...     size_type="population", size_scale=1000,
-    ... )
+Any dataset goes through ``as_settlements``, which maps your column names onto
+the canonical roles.  Project-specific loaders for the included example CSVs
+live in ``scripts/run_unified.py``, not in this package.
 
 Years are read in whichever scale the source uses, set by ``time_scale``, and
 are written out as years BP.  Use ``set_year_display("BCAD")`` for BC/AD labels
@@ -45,7 +48,6 @@ from .plots import (
     plot_size_totals,
     plot_urban_share,
 )
-from .readers import read_viabundus, read_yautepec
 from .schema import ALL_ROLES, OPTIONAL_ROLES, REQUIRED_ROLES, ColumnRoles, SchemaError
 from .settlements import SIZE_TYPES, Settlements, SizeSpec, TimeSpec, as_settlements
 from .theme import save_figure
@@ -77,9 +79,6 @@ __all__ = [
     "REQUIRED_ROLES",
     "OPTIONAL_ROLES",
     "ALL_ROLES",
-    # readers
-    "read_yautepec",
-    "read_viabundus",
     # metrics
     "settlement_duration",
     "settlement_events",

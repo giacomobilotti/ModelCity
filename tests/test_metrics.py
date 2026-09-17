@@ -8,13 +8,13 @@ from modelcity import (
     as_settlements,
     kde,
     rank_size,
-    read_yautepec,
     settlement_churn,
     settlement_duration,
     size_summary,
     size_totals,
     urban_share,
 )
+from run_unified import read_yautepec
 
 # Produced by R:
 #   x <- c(120, 250, 260, 400, 900, 1500, 1520, 3000)

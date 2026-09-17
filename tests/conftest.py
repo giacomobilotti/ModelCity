@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +10,11 @@ from modelcity.timescale import get_year_display, set_year_display
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "examples"
+SCRIPTS = ROOT / "scripts"
+
+# Dataset loaders live in scripts/run_unified.py, not in the modelcity package.
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 
 
 @pytest.fixture(autouse=True)

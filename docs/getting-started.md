@@ -16,8 +16,8 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-The optional `geo` extra installs `pyproj`, which is needed only by readers that
-convert projected coordinates:
+The optional `geo` extra installs `pyproj`, which the Viabundus demo loader in
+`scripts/run_unified.py` uses when assigning regions from projected coordinates:
 
 ```bash
 python -m pip install -e ".[dev,geo]"
