@@ -8,14 +8,17 @@ load source data
     ├── interval records: map start + end
     └── snapshot records: map observation year only
              ↓
-       as_settlements()
+       as_settlements()          ← data preparation
              ↓
  inspect canonical data and assumptions
              ↓
- calculate DataFrame metrics
+ calculate DataFrame metrics     ← analysis
              ↓
- create and save Matplotlib figures
+ create and save Matplotlib figures  ← visualisation / output
 ```
+
+A function-by-function map of these stages is in
+[Methodologies by stage](methodologies.md).
 
 ## 1. Load a DataFrame
 

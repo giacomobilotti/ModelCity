@@ -9,6 +9,7 @@ settlement tables and applying a common set of metrics and plots.
 - Bringing a table: [Adapting a new dataset](adapting-datasets.md)
 - Understanding assumptions: [Canonical data model](data-model.md)
 - Building an analysis: [End-to-end workflow](workflow.md)
+- Library stages and functions: [Methodologies by stage](methodologies.md)
 
 ## Reference
 

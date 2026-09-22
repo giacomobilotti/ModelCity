@@ -117,6 +117,7 @@ See [Adapting datasets](docs/adapting-datasets.md) for complete mapping recipes.
 - [Getting started](docs/getting-started.md)
 - [Canonical data model](docs/data-model.md)
 - [End-to-end workflow](docs/workflow.md)
+- [Methodologies by stage](docs/methodologies.md)
 - [Metrics and plots](docs/metrics-and-plots.md)
 - [Adapting new datasets](docs/adapting-datasets.md)
 - [Python API](docs/python-api.md)
