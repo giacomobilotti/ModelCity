@@ -1,0 +1,927 @@
+---
+title: "Yautepec survey analyses"
+author: "Giacomo Bilotti"
+execute:
+  echo: false
+  warning: false
+  message: false
+bibliography: references.bib
+format:
+  pdf:
+    geometry:
+      - margin=0.5in
+    fig-width: 10
+    fig-height: 7.5
+---
+
+# Introduction
+
+This script is needed to run the analyses on the sites from the Yautepec survey (@fig-survey).
+
+```{r}
+#| label: fig-survey
+#| out-width: '100%'
+
+knitr::include_graphics('survey_sites.png')
+```
+
+\newpage
+
+```{r}
+#| label: setup
+#| output: false
+
+# load libraries
+library(sf)
+library(tidyverse)
+library(ggplot2)
+# install.packages("devtools")
+# devtools::install_github("davidsjoberg/ggsankey")
+library(ggsankey)
+# library(ggh4x)
+library(tmap)
+library(car)
+
+
+# set up directories
+targetdir <- file.path('data', 'derived_data')
+
+# load data
+sites <- st_read(
+  dsn = file.path(targetdir, 'yautepec.gpkg'),
+  layer = 'sites_processed'
+)
+area <- st_read(
+  dsn = file.path(targetdir, 'yautepec.gpkg'),
+  layer = 'area'
+)
+rivers <- st_read(
+  dsn = file.path(targetdir, 'yautepec.gpkg'),
+  layer = 'rivers'
+)
+```
+
+\newpage
+
+## Site duration
+
+```{r}
+#| label: fig-site-duration
+#| fig-cap: 'Average site duration in the study region.'
+
+occupation <- sites |>
+  group_by(Sitio) |>
+  mutate(
+    duration = max(start, na.rm = TRUE) - min(end, na.rm = TRUE)
+  ) 
+# for global duration we need only one entry per site
+occupation <- occupation[!duplicated(occupation$Sitio),]
+
+# Compute density
+d <- density(occupation$duration, bw = 150)
+
+# Find local maxima
+# (points where derivative changes from + to -)
+peaks_idx <- which(diff(sign(diff(d$y))) == -2) + 1
+
+# Extract coordinates of peaks
+peaks_x <- d$x[peaks_idx]
+peaks_y <- d$y[peaks_idx]
+
+# Plot the density
+plot(
+  d, main = '', frame = FALSE,   lwd = 2, col = 'brown4',
+  xlim = c(0, 3000), ylim = c(0, 1.5e-03)
+)
+
+# Add peak markers
+points(peaks_x, peaks_y, pch = 19, col = 'darkred')
+
+# Optionally, add text labels for clarity
+text(peaks_x, peaks_y, labels = round(peaks_x), pos = 3, cex = 0.8, col = 'darkred')
+
+### write down not the year of persistence but the amount of sites per period
+### print the stats: median and SD
+```
+
+In the study region, the median site duration is `r median(occupation$duration)`. However, the density peak is at about 224 years and there is a fat tail towards the right side, with two local peaks around 1400-1550 years and 2600 years (@fig-site-duration). However, there is the chance that this is an artefact of the typochronological periods, as \~ 56% of the sites have a dating precision of 140-300 years (294 "unique" sites).
+
+\newpage
+
+## Foundations and abandonments
+
+There might be the same bias due to the typochronological periodisation, but it is possible to look at some general trends (@fig-abandonments). Most of the foundation occur after 2000 years BP, with a fairly constant rate and a peak at around 750-600 years BP, before a sharp decline, likely due to the end of the sampling in the survey (post-colonial and contemporary era). On the other hand, the trend of site abandonments is different, with two peaks at \~ 1700 BP and another around 600 BP, slightly lagged compared to the foundation peak.
+
+```{r}
+#| label: fig-abandonments
+#| fig-cap: 'Density of foundations and abandonments over time of the Yatepec sites. In this case, a bandwidth of 150 years was used.'
+
+ggplot() +
+  geom_density(
+    data = occupation,
+    aes(
+      x = start,
+      colour = "Site Foundations"
+    ),
+    size = 1, alpha = 0.25, bw = 150
+  ) +
+  geom_density(
+    data = occupation,
+    aes(
+      x = end,
+      colour = "Site Abandonments"
+    ),
+    size = 1, alpha = 0.25, bw = 150
+  ) +
+  scale_colour_manual(
+    name = NULL,
+    values = c(
+      "Site Foundations"      = "lightblue",
+      "Site Abandonments"   = "orangered"
+    )
+  ) +
+  theme_minimal() +
+  xlab("Years BP") +
+  ylab("Density") +
+  scale_x_reverse() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1) )
+```
+
+\newpage
+
+```{r}
+#| label: fig-diff
+#| fig-cap: 'Rate of change calculated for the sites in the study area. The light blue line represents the CHURN (total change). The grey line represents the difference between foundations and abandonments and it is shaded in green when it is positive and red when negative.'
+
+found_dens <- density(occupation$start, na.rm = TRUE, 
+                      bw = 150)
+
+aban_dens <- density(occupation$end, bw = 150)
+
+# helper to get a data.frame of x, density and event type
+get_density <- function(x, from=1, to=3500, n=3498){
+  dens <- density(x, from=from, to=to, n=n, na.rm=TRUE)
+  data.frame(year = dens$x,
+             density = dens$y)
+}
+
+# 2) compute for each group & event
+df_found  <- get_density(occupation$start)
+df_aband  <- get_density(occupation$end)
+
+df_sum <- df_found |>
+  mutate(sum  = density + df_aband$density,
+         diff = density - df_aband$density)
+
+# plot
+ggplot(df_sum, aes(x = year, y = sum)) +
+  geom_ribbon(aes(ymin = 0, ymax = ifelse(diff > 0, diff, 0)),
+              fill = "darkgreen", alpha = 0.2) +
+  geom_ribbon(aes(ymin = ifelse(diff < 0, diff, 0), ymax = 0),
+              fill = "firebrick", alpha = 0.2) +
+
+  # baseline and line
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_line(size = 1, colour = "lightblue3") +
+  geom_line(size = 1, colour = "grey55", aes(y = diff)) +
+  # labels and formatting
+  labs(
+    x     = "Year",
+    y     = "Density",
+    color = NULL
+  ) +
+  geom_vline(xintercept = 430, lty = 2, col = 'red') +
+  scale_x_reverse(breaks = seq(3500, 0, by = -250),
+                  labels = seq(-1500, 2000, by = 250)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
+
+\newpage
+
+### Total occupied area by over time
+
+As an additional measurement we can observe how much area was occupied at any given moment (@fig-area-tot). At the same time we can also see whether there is a relationship between the total area and the number of sites. @fig-area-tot shows that for all period there is a direct relation between the amount of sites and the area occupied, suggesting that site size did not change too much over time. The only exception is for 1350-1100 BP (600-800 AD), when site number decreases and occupied areas increases.
+
+Comparing the figure with @fig-diff reveals that the moments marked by high CHURN and a prevalence of abandonments over occupations (\~ 1750 and 500 BP) are the periods with the largest occupied area (\> 700 ha between 1750-1500 BP & \> 500 between ca. 650-500 BP).
+
+```{r}
+#| label: fig-area-tot
+#| fig-cap: 'Total site area (grey bars) and number of sites per phase over time (light blue triangles). Note that the precision of the different time frames varies according to the typo-chronological precision of the archaeological phase.'
+
+areas_sum <- sites |>
+  group_by(start, end) |>
+  summarise(Total_area = sum(Area, na.rm = TRUE)) |>
+  ungroup()
+
+total_sites <- sites |> 
+group_by(start, end) |>
+  summarise(Total_sites = n(), .groups = "drop")
+
+
+ggplot(areas_sum, aes(x = start, xend = end)) +
+  # total area as thick horizontal segments
+  geom_segment(
+    aes(y = Total_area, yend = Total_area),
+    linewidth = 3, alpha = 0.8, colour = "grey25"
+  ) +
+  # total sites as points with secondary axis
+  
+  # geom_segment(data = total_sites,
+  #   aes(x = start, xend = end, y = Total_sites*4, yend = Total_sites*4),
+  #   colour = "darkgreen", size = 3
+  # ) +
+ geom_point(data = total_sites,
+    aes(x = (start - (start - end)/2), y = Total_sites*4),
+    fill = "lightblue2", size = 3, pch = 24
+  ) +
+  scale_x_reverse(breaks = seq(4000, 250, by = -250),
+                  labels = seq(-2000, 1750, by = 250)) +
+  scale_y_continuous(
+    name = "Total occupied area [ha]",
+    sec.axis = sec_axis(~ . /4 ,
+                        name = "Total number of sites")
+  ) +
+  labs(
+    x = "Years BC/AD"
+  ) +
+  theme_minimal(base_size = 13) +
+  geom_vline(xintercept = 430, lty = 2, col = 'red') +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# # another way to visualise it as simple bars:
+# ggplot(areas_sum, aes(xmin = end_bp, xmax = start_bp,
+#                       ymin = 0, ymax = Total_area)) +
+#   geom_rect(alpha = 0.5) +
+#   scale_x_reverse(breaks = seq(4000, 0, by = -500)) +
+#   labs(
+#     x = "Years BP",
+#     y = "Total occupied area",
+#     title = "Total site area per phase"
+#   ) +
+#   theme_minimal() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+\newpage
+
+<!-- Measuring site number variation over time can be misleading, as A very similar result is obtained if we try to define the aoristic sum (@fig-aor), indicating that increased area is directly related to more settlements (otherwise) -->
+
+```{r}
+#| label: fig-aor
+#| fig-cap: 'Aoristic sum of site occupation.'
+#| eval: false
+
+aor_mat <- baorista::createProbMat(
+  x = st_drop_geometry(sites[,c(3:4)]), timeRange = c(3500, 101), resolution = 100
+)
+
+plot(aor_mat)
+# ## Use the minimum site are as unit (0.1 ha)
+# # I this way, each 0.1 ha represent one entry in the aoristic
+# sites_ha <- sites |>
+#   mutate(n_rep = pmax(1, round(Area / 0.1))) |>
+#   tidyr::uncount(n_rep)
+# 
+# aor_mat_01 <- baorista::createProbMat(
+#   x = st_drop_geometry(sites_ha[,c(17:18)]), timeRange = c(3500, 1), resolution = 100
+# )
+# # It looks pretty much the same, therefore it is not necessary as it takes much longer
+# plot(aor_mat_01)
+# plot(aor_mat)
+```
+
+#### Rank-size analysis
+
+The Zipf's law (rank–size) states that the size of the r-th ranked unit (Ar) is proportional to 1/r of the largest unit (A1):
+
+$Ar = A1 / r$
+
+Deviance from this ideal trend can reveal the settlement structure that we are analysing.
+
+```{r}
+#| label: fig-zipf
+#| fig-cap: 'Rank–size distribution by period.'
+
+
+rank_data <- sites |>
+  group_by(Fase) |>
+  arrange(desc(Area)) |>
+  mutate(
+    Rank = row_number(),
+    ideal_freq = max(Area, na.rm = TRUE) / Rank
+  ) |>
+  ungroup()
+
+ggplot(rank_data[!rank_data$Fase %in% c('S', 'EF', 'Col'),],
+       aes(x = Rank, y = Area)) +
+  geom_line(col = 'steelblue') +
+  geom_line(aes(y = ideal_freq), lty = 2, col = 'grey40') +
+  # geom_point() +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(
+    x = "Rank (log scale)",
+    y = "Site area (log scale)"
+  ) +
+  theme_minimal(base_size = 13) +
+  facet_wrap(~Fase, scales = "free") 
+```
+
+\newpage
+
+## Urbanisation trends
+
+Let's look at how average and median site size changed over time (@fig-median-area). As we can see, the median site is relatively stable throughout the period analysed, with values between 0.5 and 0.7 ha (@tbl-median-area). Only between 2049-1500 BP (100 BC - 450 AD), 1350-800 BP (600-1150 AD) and 650-430 BP (1300-1520 AD) there are at least 10% of the sites with a size above 5 ha and only between 1700-1500 BP 10% of sites are larger than 9.8 ha. The largest site in the region (ID: 200) dates to 510 - 430 BP (Molotla phase, 122.5 ha) as is the second largest site (ID: 160; size: 102.8 ha). Only 11 sites have an area above 40 ha and they are all dated to the Molotla (M, 3 sites), Atlan (A; 650 - 510 BP; 1 site), Epacapa (EPC; 1100-800 BP; 1 site), Early and Middle Classic (3 sites each phase).
+
+```{r}
+#| label: fig-median-area
+#| layout-nrow: 2
+#| fig-cap: 'Site area distribution per temporal interval.'
+#| fig-subcap: 
+#| - 'Median value is indicated as a dark brown line, mean as dashed dark orange and the shaded area indicates the 10–90% range. The largest site in each period is indicated as a white dot. Y scale is log10. Note that there is only one site dating to 430-300 BP and four to 3500-3050 BP.'
+#| - 'Largest site per phase.'
+
+areas_median <- sites |>
+  st_drop_geometry() |>
+  group_by(start, end) |>
+  summarise(median = median(Area, na.rm = TRUE),
+            mean   = mean(Area, na.rm = TRUE),
+            max    = max(Area, na.rm = TRUE),
+            q10    = quantile(Area, probs = .1, na.rm = TRUE),
+            q90    = quantile(Area, probs = .9, na.rm = TRUE)
+            ) |>
+  ungroup()
+
+ggplot(areas_median) +
+  # Shaded 10–90% quantile range
+  geom_rect(
+    aes(xmin = end, xmax = start, ymin = q10, ymax = q90),
+    fill = "burlywood3", alpha = 0.3, colour = NA
+  ) +
+  # Median line (dark)
+  geom_segment(
+    aes(x = start, xend = end, y = median, yend = median),
+    colour = "brown4", linewidth = 1.2
+  ) +
+  # Mean line (lighter)
+  geom_segment(
+    aes(x = start, xend = end, y = mean, yend = mean),
+    colour = "sienna3", linewidth = 1, linetype = "dashed"
+  ) +
+  # Max points
+  scale_x_reverse(breaks = seq(4000, 250, by = -250),
+                  labels = seq(-2000, 1750, by = 250)) +
+  scale_y_continuous(
+    name = "Site area (ha)") +
+  labs(
+    x = "Years BC/AD"
+  ) +
+  theme_minimal(base_size = 13) 
+
+ggplot(areas_median, aes(x = (start - (start - end)/2), y = max)) +
+  geom_line() +
+  geom_point(
+    colour = "black", shape = 21, fill = "white", size = 2
+  ) +
+  scale_x_reverse(breaks = seq(4000, 250, by = -250),
+                  labels = seq(-2000, 1750, by = 250)) +
+  scale_y_continuous(
+    name = "Site area (ha)") +
+  labs(
+    x = "Years BC/AD"
+  ) +
+  theme_minimal(base_size = 13) 
+
+```
+
+```{r}
+#| label: tbl-median-area
+#| tbl-cap: 'Summary of site size over time. The values are represented graphically in @fig-median-area.'
+
+knitr::kable(
+  areas_median
+)
+
+knitr::kable(
+  st_drop_geometry(sites), 'latex'
+)
+
+```
+
+40 ha has been considered to be an adequate threshold for urban sites [@smith2021], indicating that the study area could be considered "urban" during the time frame considered. Extending it to 20 ha as in @smith2021, the number of possible urban centres increases (49) as does the chronological span. These thresholds are assumed to represent sites with 2,000 and 1,000 inhabitants.
+
+```{r}
+#| label: fig-urb-rates
+#| fig-cap: 'Urbanisation trends over time as area percentage belonging to "urban centres". Solid line represent the total area occupied by urban sites and the dashed line the percentage.'
+
+urban_areas <- sites |>
+  st_drop_geometry() |>
+  group_by(start_bp, end_bp) |>
+  summarise(total    = sum(Area, na.rm = TRUE),
+            urban_40 = sum(Area[Area >= 40], na.rm = TRUE),
+            urban_20 = sum(Area[Area >= 20], na.rm = TRUE),
+            perc_40  = urban_40 / total * 100,
+            perc_20  = urban_20 / total * 100,
+            n = n()
+            ) |>
+  ungroup()
+
+ggplot(urban_areas) +
+  # geom_segment(
+  #   aes(x = start, xend = end, y = total, yend = total),
+  #   linewidth = 3, colour = "grey60", alpha = 0.8
+  # ) +
+  # geom_segment(
+  #   aes(x = start, xend = end, y = urban_20, yend = urban_20, colour = "≥20 ha"),
+  #   linewidth = 2
+  # ) +
+  # geom_segment(
+  #   aes(x = start, xend = end, y = urban_40, yend = urban_40, colour = "≥40 ha"),
+  #   linewidth = 2
+  # ) +
+  # geom_line(
+  #   aes(x = start, y = total),
+  #   linewidth = 3, colour = "grey60", alpha = 0.8
+  # ) +
+  geom_line(
+    aes(x = (start_bp + end_bp)/2, y = urban_20, colour = "≥20 ha")
+  ) +
+  geom_line(
+    aes(x = (start_bp + end_bp)/2, y = urban_40, colour = "≥40 ha")
+  ) +
+  scale_colour_manual(
+    name = "Urban threshold",
+    values = c("≥20 ha" = "#3182bd", "≥40 ha" = "#de2d26")
+  ) +
+  scale_x_reverse(breaks = seq(3500, 500, by = -250),
+                  labels = rcarbon::BPtoBCAD(seq(3500, 500, by = -250)) ) +
+  labs(
+    x = "Years BC/AD") +
+  theme_minimal(base_size = 13) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend_bp.position = "bottom"
+  ) +
+  geom_line(aes(x = (start_bp + end_bp)/2, y = perc_20 * max(total) / 100),
+          linetype = "dashed", colour = "#3182bd", lwd = 1.2) +
+geom_line(aes(x = (start_bp + end_bp)/2, y = perc_40 * max(total) / 100),
+          linetype = "dashed", colour = "#de2d26", lwd = 1.2) +
+scale_y_continuous(
+  name = "Total occupied area [ha]",
+  sec.axis = sec_axis(~ . / max(urban_areas$total) * 100,
+                      name = "Percentage of total area (%)") 
+) +
+  theme(legend.position = 'bottom')
+
+```
+
+\newpage
+
+## Site trajectories
+
+The next step involves looking into individual trajectories, trying to identify which sites grew bigger and why or at what rate they did it.
+
+```{r}
+#| label: fig-trajectory
+#| fig-cap: 'Site trajectories over time. Sites with an area above 20 ha at the end of the Precolombian period are highlighted in blue (n = 9). Sites in brown are sites that were above 20 ha but failed to remain large until the end of the period (n = 22).'
+
+# sites_growth <- sites |>
+#   arrange(Sitio, start) |>
+#   group_by(Sitio) |>
+#   mutate(
+#     prev_area = dplyr::lag(Area),
+#     growth_abs = Area - prev_area,
+#     growth_rate = (Area - prev_area) / prev_area
+#   ) |>
+#   ungroup() |>
+#   filter(start > 431)
+
+# Now create an extended df with information on all periods, regardless of the presence of a site (when not present area = 0)
+site_ids <- unique(sites$Sitio)
+periods  <- unique(st_drop_geometry(sites)[, c("start", "end")])
+ 
+ext_mat <- merge(
+  data.frame(ID = site_ids),
+  periods,
+  by = NULL
+)
+
+sites_join <- sites[, c("Sitio", "start", "end", "Area")] 
+
+ext_df <- merge(
+  ext_mat,
+  sites_join,
+  by.x = c("ID", "start", "end"),
+  by.y = c("Sitio", "start", "end"),
+  all.x = TRUE
+)
+
+# Fill missing areas with 0
+ext_df$Area[is.na(ext_df$Area)] <- 0
+
+# Compute growth
+ext_df$start_bc <- bcad_to_bp(ext_df$start, bc_to_bp = FALSE)
+ext_df <- ext_df[order(ext_df$ID, ext_df$start_bc), ]
+
+ext_df <- within(ext_df, {
+  prev_area   <- ave(Area, ID, FUN = \(x) c(NA, head(x, -1)))
+  growth_abs  <- Area - prev_area
+  growth_rate <- (Area - prev_area) / prev_area
+})
+
+# Replace NaN/Inf if desired
+ext_df$growth_rate[!is.finite(ext_df$growth_rate)] <- NA
+
+# ## Now filter for large sites
+# high_growth <- ext_df |>
+#   filter(Area > 5 & (Area >= 20 | growth_abs > .1*Area)) # large sites or sites growing more than 10% of their size
+# ids <- unique(high_growth$ID)
+
+# filter out hamlets
+teo <- ext_df[ext_df$ID %in% unique(ext_df$ID[ext_df$start == 1750 & ext_df$growth_rate >=.5]),]
+teo_large <- teo[teo$ID %in% unique(teo$ID[teo$start == 1750 & teo$Area > 20]),]
+
+# ext_df$ID[ext_df$start_bp < 600 & ext_df$Area > 20]
+ggplot(teo[teo$start > 431,], aes(x = start_bc, y = Area, group = ID)) +
+  geom_line(alpha = 0.3) #+
+  # geom_point() +
+  geom_line(
+    data = ext_df[ext_df$ID %in% ext_df$ID[ext_df$start >= 600 & ext_df$Area > 20] & ext_df$start > 431,],
+    colour = 'brown4',
+    linewidth = 1
+  ) +
+  geom_line(
+    data = ext_df[ext_df$ID %in% ext_df$ID[ext_df$start < 600 & ext_df$Area > 20] & ext_df$start > 431,],
+    colour = 'blue4',
+    linewidth = 1
+  ) +
+  scale_x_reverse(breaks = seq(3500, 500, by = -250),
+                  labels = seq(-1500, 1500, by = 250)) +
+  scale_y_continuous("Area [ha]") +
+  theme_minimal(base_size = 13) +
+  theme(legend_bp.position = "none") +
+  xlab('Years BC/AD')
+  
+
+gg_teo_l <- ggplot(teo[teo$start > 431,], aes(x = start_bc, y = Area, group = ID)) +
+  geom_line(alpha = 0.3) +
+  geom_line(
+    data = teo_large[teo_large$start > 431,],
+    colour = 'brown4',
+    linewidth = 1
+  ) +
+  geom_line(
+    data = teo_large[teo_large$ID %in% teo_large$ID[teo_large$end < 451 & teo_large$Area >= 20] & teo_large$start > 431,],
+    colour = 'blue4',
+    linewidth = 1
+  ) +
+  scale_y_continuous("Area [ha]") +
+  theme_minimal(base_size = 13) +
+  theme(legend_bp.position = "none") +
+  xlab('Years BC/AD') +
+  scale_x_continuous(breaks = seq(-1500, 1500, 250)) 
+
+gg_teo_l
+# ggsave(gg_teo_l, filename = file.path("figures", "Figure_14.tiff"), height = 5, width = 10, dpi = 300)
+```
+
+The sites with an area above 20 ha at \~ 1500 AD grew during the previous centuries. Only 2 cases the site had a large sites during previous periods and in both cases the size shrunk before groqing again in the last centruies before the spanish conquest.
+
+Another way to visualise success rates over time is by comparing the size of each site at each time frame to the previous period. Sites above the diagonal line indicate sites that increased in size. The plot (@fig-success) shows not only the trajectory of the largest sites at the end of the time period but also the general trends in each phase, with some periods of generalized growth and other of decline or stability.
+
+```{r}
+#| label: fig-success
+#| fig-cap: 'Success rates by phase (starting year BP is indicated). Points above the line are growing compared to the previous phase. Points aligned on the left indicate the site did not exist before (previous area = 0).'
+#| out-width: '100%'
+
+ggplot(ext_df[ext_df$start_bp > 431,], aes(x = prev_area, y = Area)) +
+  geom_point(alpha = 0.5, colour = "grey70") +
+  geom_point(
+    data = ext_df[ext_df$ID %in% ext_df$ID[ext_df$start_bp < 600 & ext_df$Area > 20] & ext_df$start_bp > 431,],
+    aes(x = prev_area, y = Area, colour = as.factor(ID)),
+    size = 2
+  ) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(
+    x = "Previous phase area [ha]",
+    y = "Current phase area [ha]",
+    title = "Site area growth",
+    colour = 'Site ID'
+  ) +
+  theme_minimal(base_size = 13) +
+  facet_wrap(~start_bp) 
+
+## add a legend saying growth/stability etc
+## calculate trend lines 
+```
+
+\newpage
+
+### Ranking sites
+
+We can visualise individual trajectories for the largest sites by looking simultaneously at their ranking and size using a sankey plot.
+
+```{r}
+#| label: fig-sankey
+#| fig-cap: 'Sankey plots for large sites. Grey bands in the background represent the area of sites above 9 ha.'
+#| layout-ncol: 3
+#| fig-subcap: ''
+#| out-width: '100%'
+
+## Prepare data. we need: Year, site ID, and Area (and rank?)
+ranked_sites <- ext_df |>
+  select(-geom) |>
+  group_by(start_bp, end_bp) |>
+  arrange(desc(Area)) |>
+  mutate(
+    Rank = row_number(),
+    Year = start_bp - (start_bp - end_bp)/2
+    ) |>
+  ungroup()
+
+df_sankey <- ranked_sites |> 
+  group_by(Year, Area) |>
+  mutate(
+    new_rank = min(Rank) # make a new rank to avoid differences in sites with equal area (rownum does it)
+  )
+
+df_sankey <- df_sankey |>
+  group_by(ID) |>
+  mutate(median_rank = median(new_rank, na.rm = TRUE)) |>
+  ungroup() |>
+  mutate(ID = forcats::fct_reorder(as.factor(ID), median_rank, .desc = TRUE))
+
+large_sites <- unique(ext_df$ID[ext_df$Area > 9])
+large_ids <- unique(ext_df$ID[ext_df$ID %in% ext_df$ID[ext_df$start < 600 & ext_df$Area > 20] & ext_df$start > 431])
+
+df_sankey$large[df_sankey$ID %in% large_ids] <- 'Y'
+df_sankey$large[!df_sankey$ID %in% large_ids] <- 'N'
+
+
+for(i in seq_along(large_ids)) {
+  tmp_df <- df_sankey[!df_sankey$ID %in% large_ids[-i],]
+  
+  print(ggplot(tmp_df[tmp_df$ID %in% large_sites & tmp_df$start_bp > 450,], 
+       aes(x = Year, node = as.factor(ID), value = Area, fill = large)) +
+  geom_sankey_bump(space = 0, type = "alluvial", color = "transparent") +
+  # geom_sankey_bump(space = 0, type = "alluvial", color = "transparent", smooth = 6, fill = 'red',
+  #                  data = tmp_df[tmp_df$ID == 200,]) +
+  theme_sankey_bump(base_size = 16) +
+  labs(x = 'Year',
+       y = 'Area [ha]',
+       fill = 'Site ID',
+       color = NULL) +
+  scale_x_reverse() +
+  scale_fill_manual(
+    values = c('grey', 'lightblue'), breaks = c('N', 'Y')
+  ) +
+  guides(fill="none") +
+  ggtitle(paste0('Site ID: ', large_ids[i]))
+  )
+}
+```
+
+<!-- ### Growth structure -->
+
+<!-- Let's find out how cities grow. It has been argued that most cities grew logistically and that among large settlements, the ones with steeper growth had a shorter persistence.  -->
+
+```{r}
+#| eval: false
+# add mid year
+log_df <- ext_df |>
+  filter(ID %in% large_ids) |>
+  mutate(
+    Year = start - (start - end) / 2,
+    Duration = start - end,
+    Year = rcarbon::BPtoBCAD(Year)
+  )
+
+# a logistic growth formula:
+# population ~ K / (1 + exp(-r * (Year - t0)))
+# for K we can use the "supposed" asymptotic value (max area=.
+# the two other parameters can be calculated as:
+# the average year for t0
+
+# max area is 120, we can use 150 ha. Intercept would be theta2 and Year value the remaining coefficient. 
+# these will be the starting values for the model
+
+df_site <- log_df[log_df$ID == 200 & log_df$Year < 1510, ]
+
+library(minpack.lm)
+
+# Remove the zero value (logistic can't mathematically handle it)
+df_site_clean <- df_site |> filter(Area > 0)
+
+# Method 1: nlsLM with relaxed controls and bounds
+fit <- nlsLM(
+  Area ~ K / (1 + exp(-r * (Year - t0))),
+  data = df_site_clean,
+  start = list(
+    K = 150,  # your suggested asymptote
+    r = 0.002,  # slow growth over millennia
+    t0 = 0     # middle of your range
+  ),
+  control = nls.lm.control(
+    maxiter = 1000,
+    ftol = 1e-6,
+    ptol = 1e-6
+  ),
+  lower = c(K = 50, r = 0.0001, t0 = -2000),
+  upper = c(K = 300, r = 0.1, t0 = 2000)
+)
+
+# plot(Area ~ Year, data = df_site, type = "b")
+# curve(1/(1+exp(-(-1 + 1*x))), from=-5, to=5, main="(b)")
+# curve(1/(1+exp(-1 * (x - 1))), from=-5, to=5, main="(b)")
+
+library(brms)
+
+df_site_clean <- df_site |> filter(Area > 0)
+
+# Bayesian nonlinear model - will always give you results
+fit_bayes <- brm(
+  bf(Area ~ K / (1 + exp(-r * (Year - t0))),
+     K ~ 1, r ~ 1, t0 ~ 1,
+     nl = TRUE),
+  data = df_site_clean,
+  prior = c(
+    prior(normal(150, 50), nlpar = "K", lb = 0),
+    prior(normal(0.005, 0.01), nlpar = "r", lb = 0),
+    prior(normal(0, 500), nlpar = "t0")
+  ),
+  cores = 4,
+  chains = 4
+)
+
+# This will always converge and give you uncertainty estimates
+
+```
+
+\newpage
+
+### Spatial trends
+
+```{r}
+#| label: fig-spatial-growth
+#| fig-cap: "Site area and absolute growth over phase (starting year in years BP indicated)."
+#| fig-width: 10
+#| fig-height: 7.5
+#| out-width: "100%"
+
+ext_sf <- st_as_sf(ext_df) 
+
+for(i in unique(ext_sf$start_bp)) {
+  print(
+    tm_shape(area) + 
+      tm_polygons() + 
+      tm_shape(ext_sf[ext_sf$start_bp > 450 & ext_sf$start_bp == i,]) + 
+      tm_bubbles(size = 'Area', fill = 'growth_abs') 
+    # add phase as title
+  )
+}
+
+tm_shape(area) + 
+  tm_polygons() + 
+  tm_shape(ext_sf[ext_sf$start_bp > 450,]) + 
+  tm_bubbles(size = 'Area', fill = 'growth_abs') #+ 
+  # tm_facets(by = '-start_bp', ncol = 4)
+```
+
+\newpage
+
+#### Large sites by period
+
+#### Proximity to cities
+
+Distance of villages to cities in each time period (point 8 in Mike's list).
+
+<!-- In this section we study the persistence of smaller sites and test whether there is a relation between length of occupation and proximity to a major centre.  -->
+
+```{r}
+#| label: proximity
+
+## calculate distance between sites at different time steps. 
+# 1. group or divide sites by period. 
+# 2. isolate large sites (20, 40 ha)
+# 3. calculate distance 
+
+cities <- lapply(
+  X = sort(urban_areas$start_bp[urban_areas$urban_20 > 0], decreasing = TRUE), 
+  FUN = function(chrono) {
+    tmp_20 <- ext_sf[ext_sf$start_bp == chrono & ext_df$Area >= 20,]
+    
+    if(chrono %in% urban_areas$start_bp[urban_areas$urban_40 > 0]) {
+      tmp_40 <- ext_sf[ext_sf$start_bp == chrono & ext_df$Area >= 40,]
+    
+    return(list(
+      city_40 = tmp_40,
+      city_20 = tmp_20
+    ))
+    } else {
+      return(city_20 = tmp_20)
+    }
+    
+  })
+
+## Now create a new list with the "other cities"
+names(cities) <- paste0('bin_', sort(
+  urban_areas$start_bp[urban_areas$urban_20 > 0], decreasing = TRUE))
+
+distances <- lapply(
+  X = seq_along(cities),
+  FUN = function(i) {
+    
+    chrono <- as.numeric(strsplit(names(cities)[i], '_')[[1]][2])
+
+    if(isTRUE(is.numeric(nrow(cities[[i]])))) { # only > 20 ha exist
+      tmp <- ext_sf[!ext_sf$ID %in% cities[[i]]$ID &
+                      ext_df$start_bp == chrono,]
+      tmp <- tmp[tmp$Area > 0,]
+  
+      tmp$distance <- st_distance(tmp, st_union(cities[[i]]) )
+      
+      return(towns_20 = tmp)
+    }
+    if (isTRUE(class(cities[[i]]) == 'list')) {
+      tmp_20 <- ext_sf[!ext_sf$ID %in% cities[[i]]$city_20$ID &
+                      ext_df$start_bp == chrono,]
+      tmp_20 <- tmp_20[tmp_20$Area > 0,]
+       
+      tmp_20$distance <- st_distance(tmp_20, 
+                                     st_union(cities[[i]]$city_20) )
+
+      tmp_40 <- ext_sf[!ext_sf$ID %in% cities[[i]]$city_40$ID &
+                      ext_df$start_bp == chrono,]
+      tmp_40 <- tmp_40[tmp_40$Area > 0,]
+      tmp_40$distance <- st_distance(tmp_40, 
+                                     st_union(cities[[i]]$city_40) )
+
+      return(list(
+        towns_40 = tmp_40,
+        towns_20 = tmp_20
+        ))
+    }
+  })
+names(distances) <- names(cities)
+
+## Now check if villages closer to cities had a higher persistence
+
+# check for sites below 10 ha
+tbl_dist <- lapply(
+  X = seq_along(distances), 
+  FUN = function(i) {
+    
+    chrono <- names(distances)[i]
+    
+    if(isTRUE(is.numeric(nrow(distances[[i]])))) { # only > 20 ha exist
+      tmp_10 <- distances[[chrono]]$distance[distances[[chrono]][['Area']] <= 10,]
+      tmp_20 <- distances[[chrono]]$distance[distances[[chrono]][['Area']] > 10,]
+      tmp_all <- distances[[chrono]]$distance
+      return(list(
+        dist_10 = tmp_10, dist_20 = tmp_20, dist = tmp_all
+      ))
+
+    }
+    if (isTRUE(class(distances[[i]]) == 'list')) {
+      
+      tmp <- distances[[chrono]][['town_40']]
+      tmp_20_40 <- tmp$distance[tmp$Area > 10,]
+      # tmp_20_40 <- quantile(tmp_20_40)
+      tmp_10_40 <- tmp$distance[tmp$Area <= 10,]
+      # tmp_10_40 <- quantile(tmp_10_40)
+      tmp_all_40 <- tmp$distance
+      # tmp_all_40 <- quantile(tmp_all_40)
+
+      tmp <- distances[[chrono]][['town_20']]
+      tmp_20_20 <- tmp$distance[tmp$Area > 10,]
+      # tmp_20_20 <- quantile(tmp_20_20)
+      tmp_10_20 <- tmp$distance[tmp$Area <= 10,]
+      # tmp_10_20 <- quantile(tmp_10_20)
+      tmp_all_20 <- tmp$distance
+      # tmp_all_20 <- quantile(tmp_all_20)
+      
+
+      return(list(
+        dist_10_40 = tmp_10_40, dist_20_40 = tmp_20_40, dist_40 = tmp_all_40,
+        dist_20_40 = tmp_20_40, dist_20_40 = tmp_20_40, dist_40 = tmp_all_40
+        ))
+    }
+  }
+)
+
+names(tbl_dist) <- names(distances)
+tbl_dist$bin_2449
+
+```
+
+\newpage
+
+# References

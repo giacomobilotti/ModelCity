@@ -1,0 +1,1000 @@
+---
+title: "paper"
+format: html
+---
+
+## Introduction 
+
+This script is the master script for the analyses carried out in the paper titled:
+
+## Abstract
+
+## Data preparation
+
+Before running the analyses, we need to prepare the data. The cities need to be divided by ethno-linguistic groups (Dutch, German, Slavic, Scandinavian).
+
+```{r}
+#| label: loading
+#| 
+
+## Make it spatial and crop it to the study region 
+library(GGally)
+library(tmap)
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(readr) # for some reasons it is better than base r read.csv
+library(patchwork)
+library(scales)
+
+climdir <- file.path('data', 'raw_data', 'NOAA')
+
+source('analyses/00_loading_data.R')
+
+nodes <- st_as_sf(nodes, coords = c('Longitude', 'Latitude'), 
+                  crs = 4326) |>
+  st_transform(3035)
+
+# Load modern countries for background maps
+w <- rnaturalearthhires::map_units10[rnaturalearthhires::map_units10$REGION_UN == 'Europe',] |>
+  st_transform(3035) |>
+  st_crop(st_buffer(nodes, 1.5e+05))
+
+spatial_pop <- merge(population,  nodes, by.x = 'Nodes_ID', by.y = 'ID', all.x = TRUE)
+# reset it as spatial
+spatial_pop <- st_as_sf(spatial_pop)
+
+# load linguistic areas
+areas <- st_read(dsn  = file.path('data', 'derived_data', 'linguistic_areas.gpkg') ) |>
+  st_transform(st_crs(spatial_pop))
+
+# tm_shape(areas) + tm_polygons(fill = 'region') + tm_shape(spatial_pop) + tm_dots()
+```
+
+```{r}
+#| label: divide-cities
+#| warning: false
+#| message: false
+
+# source(file.path('scripts', 'plot_population.R'))
+
+count_pop <- lapply(
+  X = areas$region, 
+  FUN = function(country) {
+      tmp_pop <- st_intersection(spatial_pop, areas[areas$region == country,]) 
+    return(tmp_pop)
+  })
+names(count_pop) <- areas$region
+
+agg_count <- sapply(
+  X = count_pop,
+  FUN = function(country) {
+    tapply(country$Inhabitants * 1000, country$Year, sum)
+  }) |> 
+  t() |>
+  as.data.frame()
+
+agg_count$Region <- rownames(agg_count)
+
+# ggparcoord(agg_count,
+#            columns = 1:6, groupColumn = 7, # you can use any year combination
+#            showPoints = TRUE, 
+#            scale="globalminmax"
+#            ) +
+#   theme_bw() +
+#   ylab('Population') +
+#   xlab('Year') 
+
+areas_pop <- cbind(areas, agg_count[-7])
+
+# For numerical data (X1400)
+
+tm_pops <- lapply(
+  X = names(areas_pop)[2:7],
+  FUN = function(year) {
+    tm_shape(areas_pop) +
+      tm_fill(fill = year, 
+          fill.scale = tm_scale_continuous(n = 6, values = 'brewer.blues', midpoint = 500000,
+                                             ticks = c(2e4, 1e5, 5e5, 1e6, 1.5e6)),
+          fill.legend = tm_legend(title = strsplit(year, split = 'X')[[1]][2])
+          ) +
+      tm_shape(w, is.main = T) +
+      tm_borders() +
+      tm_layout(inner.margins = 0) +
+      tm_graticules(n.x = 3, n.y = 3) +
+      tm_scalebar(breaks = c(0,250,500, 750), position = c('RIGHT', 'BOTTOM'))
+  }
+)
+tmap_arrange(tm_pops, ncol = 2)
+```
+
+```{r}
+#| label: fig-city-rel-pop
+#| layout-ncol: 3
+#| fig-cap: 'Share of the total population of individual cities by region.'
+#| fig-subcap: ''
+
+# Summing total settlement population by bin
+total_pop_df <- st_drop_geometry(spatial_pop) |>
+  group_by(Year) |>
+  summarise(Total_Settlement_Pop = sum(Inhabitants, na.rm = TRUE), .groups = 'drop')
+
+spatial_pop <- spatial_pop |>
+  left_join(total_pop_df, by = 'Year')
+spatial_pop$relative_pop <- spatial_pop$Inhabitants / spatial_pop$Total_Settlement_Pop * 100
+
+# ggplot(spatial_pop, aes(x = Year, y = relative_pop)) +
+#   geom_point() +
+#   geom_line(aes(group = Nodes_ID), alpha = 0.5) +
+#   theme_minimal() +
+#   labs(
+#     title = 'City Share of Total Population',
+#     y = 'Relative Population (%)',
+#     x = 'Year'
+#   )
+
+## by region
+
+# Summing total settlement population by bin
+reg_pop_df <- lapply(
+  X = areas$region,
+  FUN = function(region) {
+
+     tmp_pop <- st_intersection(spatial_pop,areas[areas$region == region,]) 
+
+    tmp_pop <- tmp_pop |>
+      select(Nodes_ID, ID, Year, Inhabitants, Name)
+    
+    spatial_pop <- st_drop_geometry(tmp_pop) |>
+      group_by(Year) |>
+      summarise(Total_Settlement_Pop = sum(Inhabitants, na.rm = TRUE), .groups = 'drop')
+
+    spatial_pop <- spatial_pop |>
+      left_join(tmp_pop, by = 'Year')
+    spatial_pop$reg_relative_pop <- spatial_pop$Inhabitants / spatial_pop$Total_Settlement_Pop * 100
+
+    return(spatial_pop)
+  }
+) 
+
+names(reg_pop_df) <- areas$region
+
+for(country in names(reg_pop_df)) {
+  tm_gg <- ggplot(reg_pop_df[[country]], aes(x = Year, y = reg_relative_pop)) +
+  geom_point() +
+  geom_line(aes(group = Nodes_ID), alpha = 0.5) +
+  theme_minimal() +
+  labs(
+    title = paste0('City Share of Total Population in ', country, ' area'),
+    y = 'Relative Population (%)',
+    x = 'Year'
+  )
+  print(tm_gg)
+}
+```
+
+```{r}
+#| label: clean-spatial-pop
+#| output: false
+
+spatial_pop_clean <- spatial_pop |>
+  filter(!is.na(relative_pop)) |>
+  arrange(Nodes_ID, Year)
+
+city_result <- spatial_pop_clean |>
+  group_by(Nodes_ID) |>
+  summarise(
+    Name = first(Name),
+    Last_Year = max(Year),
+    Last_Share = relative_pop[Year == max(Year)],
+    Max_Share = max(relative_pop),
+    Max_Year = Year[which.max(relative_pop)],
+    Second_Max_Share = sort(relative_pop, decreasing = TRUE)[2],
+    .groups = 'drop'
+  )
+
+city_result <- city_result |>
+  mutate(
+    Status = case_when(
+      Max_Year == Last_Year & Max_Share >= Second_Max_Share * 1.10 ~ 'Won',
+      TRUE ~ 'Lost'
+    )
+  )
+
+# table(city_result$Status)
+
+# ggplot(city_result, aes(x = Second_Max_Share, y = Max_Share, label = Name)) +
+#   geom_abline(slope = 1.10, intercept = 0, linetype = 'dashed', color = 'darkgreen') +
+#   geom_point(size = 3) 
+#   # scale_color_manual(values = c(Won = 'green', Lost = 'red')) +
+#   # theme_minimal() +
+#   # labs(
+#   #   title = 'City Peak Share vs Second Best: Winners and Losers',
+#   #   x = 'Second Highest Population Share (%)',
+#   #   y = 'Maximum Population Share (%)'
+#   # )
+# 
+# plot(city_result$Last_Share ~ city_result$Max_Share)
+# # abline(slope = 1.10, intercept = 0, lty = 3, col = 'darkgreen')
+# 
+# # rank cities by catchment/region
+# # city ranking (1 to nth) in absolute 
+# # size vs ranking on log log scale should be straight line (Luis Bentancour in UCL)
+# # difference between linear scale and observed
+```
+
+```{r}
+#| label: fig-top-hits
+
+# plot(spatial_pop_clean$Year[spatial_pop_clean$Nodes_ID == 0], 
+#      spatial_pop_clean$Inhabitants[spatial_pop_clean$Nodes_ID == 0])
+# 
+# unique(spatial_pop_clean$Nodes_ID)
+# 
+# plot(spatial_pop_clean$Year[spatial_pop_clean$Nodes_ID == 0], 
+#      spatial_pop_clean$relative_pop[spatial_pop_clean$Nodes_ID == 0])
+
+spatial_pop_clean <- spatial_pop_clean |>
+  group_by(Year) |>
+  mutate(
+    pop_rank = rank(-relative_pop, ties.method = 'min')
+  ) |>
+  ungroup()
+
+## pivot table
+rank_wide <- spatial_pop_clean |>
+  select(Nodes_ID, Year, pop_rank) |>
+  pivot_wider(
+    names_from   = Year,
+    values_from  = pop_rank,
+    names_prefix = 'rank_'
+  )
+
+rank_trend <- rank_wide |>
+  mutate(
+    delta_rank = rank_1300 - rank_1650
+  ) |>
+  arrange(desc(delta_rank))
+## only 2 entries have NA in one of the years, we can ignore them
+
+top_hits <- spatial_pop_clean |>
+  filter(pop_rank <= 10) |>     # change N as you wish
+  distinct(Name)
+
+initial_best <- spatial_pop_clean$Name[spatial_pop_clean$Year == 1300 & spatial_pop_clean$pop_rank <= 20]
+
+ggplot(spatial_pop_clean, aes(x = Year, y = pop_rank, group = Name)) +
+  geom_line(alpha = 0.3) +
+  # highlight a handful of cities, if you like:
+  geom_line(data = filter(spatial_pop_clean, Name %in% top_hits$Name),
+            aes(colour = Name), size = 1) +
+  scale_y_reverse(breaks = seq(1, max(spatial_pop_clean$pop_rank), by = 20)) +
+  labs(
+    y = 'Population rank (1 = largest)',
+    title = 'City–rank trajectories over time'
+  ) +
+  theme_minimal()
+```
+
+## Sankey by region 
+
+```{r}
+#| label: fig-sankey-region
+#| results: hide
+#| fig-cap: 'Sankey plots for some of the most important cities in the study region by region.'
+#| fig-subcap: ''
+#| fig-height: 44
+
+# Vector of all unique cities
+reg_cities <- lapply(reg_hits, function(city) unique(city$Name))
+
+# Prepare data for alluvial plot
+reg_df_sankey <- lapply(
+  X = reg_pop_clean,
+  FUN = function(country) {
+    country |>
+  mutate(
+    Year_factor = as.factor(Year),
+    # Use inhabitants as the "flow" value
+    flow_value = Inhabitants
+  ) |>
+  arrange(Year, pop_rank)
+  }
+)
+
+# Function to generate one plot per city
+make_reg_plot <- function(city_name, region) {
+  df_plot <- reg_df_sankey[[region]] |>
+    mutate(
+      Highlight = if_else(Name == city_name, city_name, "Other")
+    )
+
+  # Total population per year
+  total_per_year <- df_plot |>
+    group_by(Year_factor) |>
+    summarise(total_pop = sum(Inhabitants, na.rm = TRUE), .groups = "drop")
+
+  # Rank and city population
+  ranks_per_year <- df_plot |>
+    group_by(Year_factor) |>
+    arrange(desc(Inhabitants)) |>
+    mutate(pop_rank = dense_rank(desc(Inhabitants))) |>
+    filter(Name == city_name) |>
+    select(Year_factor, city_pop = Inhabitants, pop_rank) |>
+    ungroup()
+
+  # Merge for labels
+  label_df <- left_join(ranks_per_year, total_per_year, by = "Year_factor") |>
+    mutate(
+      label_main = paste0(city_pop, " / ", total_pop),
+      label_rank = paste0("Rank: ", pop_rank)
+    )
+
+  # Fixed vertical height for rank label
+  fixed_rank_y <- max(df_plot$Total_Settlement_Pop, na.rm = TRUE) *1.15
+  fixed_rank_y2 <- max(df_plot$Total_Settlement_Pop, na.rm = TRUE) *.95
+
+
+  ggplot(df_plot,
+         aes(x = Year_factor, 
+             stratum = reorder(Name, -pop_rank),
+             alluvium = Name,
+             y = Inhabitants,
+             fill = Highlight)) +
+    geom_alluvium(alpha = 0.8, decreasing = FALSE) +
+
+    # Main population label (near stream)
+    geom_text(
+      data = label_df,
+      aes(x = Year_factor, y = fixed_rank_y2, label = label_main),
+      inherit.aes = FALSE,
+      size = 2,
+      fontface = "bold"
+    ) +
+
+    # Rank label (fixed height)
+    geom_text(
+      data = label_df,
+      aes(x = Year_factor, y = fixed_rank_y, label = label_rank),
+      inherit.aes = FALSE,
+      size = 2.2,
+      fontface = "italic"
+    ) +
+
+    scale_fill_manual(
+      values = setNames(c("lightgrey", "steelblue"), c("Other", city_name))
+    ) +
+    labs(
+      title = paste(city_name),
+      x = "Year", y = "Inhabitants", fill = city_name
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      panel.grid = element_blank(),
+      legend.position = "none"
+    )
+}
+
+
+reg_sankeys <- lapply(
+  X = areas$region,
+  FUN = function(country){
+    purrr::map(reg_cities[[country]], ~make_reg_plot(.x, country))
+  }
+)
+names(reg_sankeys) <- areas$region
+# View region plots 
+
+
+# # Prepare country-specific layouts
+# all_sankey_plots <- c(
+#   reg_sankeys$dutch, 
+#   reg_sankeys$danish, 
+#   reg_sankeys$germanic, 
+#   reg_sankeys$slavic)
+# # Combine and layout: adjust ncol as needed (e.g., 3 columns)
+# wrap_plots(all_sankey_plots, ncol = 3)
+```
+
+## Total change (adapted CHURN)
+
+```{r}
+#| label: fig-rank-change
+#| fig-cap: 'Amount of change per time frame by region. Every change in rank (up or down) is summed and normalised to the length of the time frame.' 
+
+reg_pop_clean <- lapply(
+  X = reg_pop_df, 
+  FUN = function(country) {
+    country |>
+      group_by(Year) |>
+      mutate(
+        pop_rank = rank(-reg_relative_pop, ties.method = 'min')
+       ) |>
+      ungroup()
+  }
+)
+
+reg_hits <- lapply(
+  X = reg_pop_clean,
+  FUN = function(country) {
+    country |>
+      filter(pop_rank <= 7) |>     # change N as you wish
+      distinct(Name)
+  }
+)
+
+pop_ranks <- spatial_pop_clean |>
+  select(Nodes_ID, Name, Year, Inhabitants, Total_Settlement_Pop, relative_pop, pop_rank)
+
+pop_ranks <- pop_ranks |> 
+  group_by(Nodes_ID) |>
+  mutate(
+    rank_change = lag(pop_rank) - pop_rank,
+    rank_normalised = rank_change / (Year - lag(Year))
+  )
+
+rank_change <- pop_ranks |>
+  st_drop_geometry() |>
+  group_by(Year) |>
+  summarise(
+    total_change = sum(abs(rank_change), na.rm = TRUE),
+    total_change_normal = sum(abs(rank_normalised), na.rm = TRUE)
+  ) 
+rank_change$scaled_change <- rank_change$total_change_normal/max(rank_change$total_change_normal)
+
+## by region
+reg_ranks <- lapply(
+  X = names(reg_pop_clean), 
+  FUN = function(region) {
+    tmp <- reg_pop_clean[[region]] |> 
+      select(Nodes_ID, Name, Year, Inhabitants, Total_Settlement_Pop,
+             reg_relative_pop, pop_rank) |>
+      group_by(Nodes_ID) |>
+      mutate(
+        rank_change = lag(pop_rank) - pop_rank,
+        rank_normalised = rank_change / (Year - lag(Year))
+        )
+})
+names(reg_ranks) <- names(reg_pop_clean)
+
+reg_change <- lapply(
+  X = names(reg_ranks),
+  FUN = function(region) {
+    tmp <- reg_ranks[[region]] |>
+      group_by(Year) |>
+      summarise(
+        total_change = sum(abs(rank_change), na.rm = TRUE),
+        total_change_normal = sum(abs(rank_normalised), na.rm = TRUE)
+      )
+    tmp$region <- region
+    tmp$scaled_change <- tmp$total_change_normal/max(tmp$total_change_normal)
+    return(tmp)
+  })
+
+rank_change$region <- 'Global'
+
+ranks_collapsed <- do.call(rbind, reg_change)
+ranks_collapsed <- rbind(ranks_collapsed, rank_change)
+
+ggplot(data = ranks_collapsed, aes(x = Year, y = total_change_normal, group = region, col = region)) +
+  geom_line(lwd = 1.5, show.legend = FALSE) +
+  theme_classic() +
+  xlim(1400, 1650) +
+  ylab('Normalized change') +
+  facet_wrap(facets='region', scales = 'free_y')
+```
+
+```{r}
+#| label: fig-success-trajectories
+#| fig-cap: 'Global success and failure rates by region.'
+#| layout-ncol: 2
+#| fig-subcap: ''
+
+# Apply logic to all regions in reg_ranks
+reg_ranks_classified <- map(reg_ranks, function(df) {
+  df <- df |>
+    group_by(Year) |>
+    mutate(treshold = max(pop_rank, na.rm = TRUE) / 10) |>
+    ungroup() |>
+    mutate(
+      Fail = ifelse(rank_change < -treshold & Year != min(Year), TRUE, FALSE),
+      Success = ifelse(rank_change > treshold & Year != min(Year), TRUE, FALSE),
+      Stability = ifelse(!Fail & !Success & Year != min(Year), TRUE, FALSE)
+    ) |>
+    group_by(Year) |>
+    ungroup() |>
+    mutate(
+      Stability_Type = case_when(
+        Stability & pop_rank <= treshold ~ "positive",
+        Stability & pop_rank > treshold ~ "negative",
+        TRUE ~ NA_character_
+      )
+    )
+
+  return(df)
+})
+
+for(region in areas$region) {
+ tmp <- reg_ranks_classified[[region]] |>
+  group_by(Year) |>
+  summarise(
+    Success = sum(Success, na.rm = TRUE) / length(Success),
+    Fail = sum(Fail, na.rm = TRUE) / length(Fail),
+    Stability_Pos = sum(Stability_Type == "positive", na.rm = TRUE) / length(Stability_Type),
+    Stability_Neg = sum(Stability_Type == "negative", na.rm = TRUE) / length(Stability_Type)
+  ) |>
+  pivot_longer(-Year, names_to = "Category", values_to = "Count") |>
+  ggplot(aes(x = Year, y = Count, fill = Category)) +
+  geom_area(alpha = 0.8) +
+  scale_fill_manual(values = c(
+    Success = "steelblue",
+    Fail = "red3",
+    Stability_Pos = "darkgreen",
+    Stability_Neg = "grey60"
+  )) +
+  labs(
+    title = paste0("City Trajectory Categories Over Time - ", region),
+    y = "Number of Cities", x = "Year", fill = "Trajectory"
+  ) +
+  theme_minimal() +
+  xlim(1400, 1650) 
+ print(tmp)
+}
+
+```
+
+```{r}
+#| label: fig-city-sankey
+#| fig-cap: 'Aggregated change trends over time. This figure is similar to @fig-success-trajectories but traces the the origin of stability, failure and success.'
+#| layout-ncol: 2
+#| fig-subcap: ''
+#| results: hide
+
+lapply(
+  X = areas$region,
+  FUN = function(region) {
+    tmp_status <- reg_ranks_classified[[region]][reg_ranks_classified[[region]]$Year != 1300,] |>
+    mutate(Status = case_when(
+    Success == TRUE ~ "Success",
+    Fail == TRUE ~ "Fail",
+    Stability_Type == "positive" ~ "Stable+",
+    Stability_Type == "negative" ~ "Stable−",
+    TRUE ~ "Unclassified"
+  ))
+    
+  ggplot(tmp_status,
+       aes(x = Year, stratum = Status, alluvium = Name, y = 1, fill = Status)) +
+  geom_flow(alpha = 0.7) +
+  geom_stratum(width = 0.3) +
+  scale_fill_manual(values = c(
+    "Success" = "#2ECC71",
+    "Fail" = "#E74C3C",
+    "Stable+" = "#9ACD32",
+    "Stable−" = "#3498DB",
+    "Unclassified" = "grey80"
+  )) +
+  labs(
+    title = paste0("City Trajectories in ", region, ' area'),
+    x = "Year", y = "", fill = "Status"
+  ) +
+  theme_minimal()
+  }
+)
+```
+
+## Conflict 
+
+```{r}
+#| label: conflict
+#### Conflict ####
+
+# Miller & Shuvo Bakar 2022. Journal of Conflict resolution 67(2-3), 522-554. DOI:10.1177/00220027221119085
+
+HCED <- read_csv("data/raw_data/conflict/HCED Data v2.csv")
+
+# Drop the first column (row numbers)
+HCED <- HCED[,-1] 
+HCED <- HCED[as.numeric(HCED$Year) <= 1950 & as.numeric(HCED$Year) >= 1000,]
+HCED <- HCED[!is.na(HCED$Longitude),] 
+
+## Make it spatial and crop it to the study region 
+nodes <- read.csv(file = file.path('data', 'raw_data', 'Viabundus-1.3-CSV', 'Nodes.csv'), 
+                  fileEncoding = "UTF-8") |>
+  sf::st_as_sf(coords = c('Longitude', 'Latitude'), crs = 4326) 
+
+conflict <- sf::st_as_sf(
+  HCED, coords = c('Longitude', 'Latitude'), crs = 4326
+) |>
+  sf::st_crop(terra::ext(-5, 40, 40, 65))
+
+### Visualisation 
+
+conflict$Year_num <- as.numeric(conflict$Year)
+
+reg_conflict <- lapply(
+  X = areas$region,
+  FUN = function(region) {
+    st_intersection(st_transform(conflict, st_crs(areas)), 
+                    areas[areas$region == region,])
+  }
+)
+names(reg_conflict) <- areas$region
+
+# --- Combine all regional conflicts into one df ---
+reg_conflict_df <- do.call(rbind, lapply(names(reg_conflict), function(r) {
+  df <- reg_conflict[[r]]
+  if (nrow(df) > 0) {
+    df$region <- r
+  }
+  df
+}))
+
+# --- Density plot by region ---
+conflict_density <- ggplot(reg_conflict_df, aes(x = Year_num, colour = region)) +
+  geom_density(size = 1.2, alpha = 0) +   # adjust smooths bandwidth
+  scale_color_manual(values = c("dutch" = "#E31A1C",
+                               "germanic" = "#1F78B4", 
+                               "danish" = "#33A02C",
+                               "slavic" = "#FF7F00")) +
+  labs(title = "Density of Battles by Region",
+       x = "Year CE",
+       y = "Density",
+       fill = "Region") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold")) 
+
+print(conflict_density)
+
+```
+
+## Climate
+
+```{r}
+#| label: load-climate
+
+#### Xu et al 2024 ####
+# North Atlantic-European Sector Jet Stream (EU JSL) Reconstruction Data from 1300-2004 CE
+
+Xu <- read.table(file.path(climdir, 'reconstruction', 'xu2024', 
+                           'xu2024-eu_jsl.txt'), header = TRUE,
+                         sep = "\t", comment.char = "#") |>
+  subset(Year <= 1800)
+# the second column (Ins_EU_JSL) refers to the period when it was directly measured and not reconstructed
+
+#### Büntgen et al. (2021) ####
+# self-calibrating Palmer Drought Severity Index
+# positive values indicate relatively wet summers, negative dry
+scpdsi <- read.table(file.path(climdir, "treering", "reconstructions", "buntgen2021scpdsi-noaa.txt"), 
+                     header = TRUE, 
+                     comment.char = "#", 
+                     sep = "\t")
+
+#### Büntgen, U., et al.  2011 #####
+## Central Europe 2500 Year Tree Ring Summer Climate Reconstructions 
+# Based on Oak trees treering separating between NE France, SE Germany and NE Germany
+
+# Independent reconstructions for DE and CH are also included
+## Combined T and Prec data
+buentgen11 <- read_excel(
+  file.path(climdir, "treering", "reconstructions", "buentgen2011europe.xls"), 
+  sheet = "Fig.4 Recons", skip = 6) |>
+  subset(Year <= 1800)
+buentgen11 <- buentgen11[,-6]
+
+names(buentgen11) <- c("Year", "Precipitation", "P_lo", "P_up", "P_Ind_DE",
+                       "Summer Temperature", "T_lo", "T_up", "T_Ind_DE")
+
+
+### Now the regional series
+buent2011reg <- read_excel(
+  file.path(climdir, "treering", "reconstructions", "buentgen2011europe.xls"),
+  sheet = "Fig S4 Oak Extremes", skip = 6) |>
+  subset(year...1 > 1199)
+
+#### Linderholm et al 2015 ####
+# Fennoscandia 900 Year Summer Temperature Reconstruction from tree rings
+
+Scandi15 <- read.table(
+  file.path(climdir, 'treering', 'reconstructions', 'fennoscandia2015temp.txt'),
+  header = TRUE, sep = '\t', comment.char = "#"
+) |>
+  subset(age_CE < 1801)
+
+#### Buntgen et al 2013 ####
+# Eastern Europe 1000 Year May-June Temperature Reconstruction
+# Trees used in the study come from Tatra mountain in Slovakia
+
+EastEU13 <- read.table(
+  file.path(climdir, 'treering', 'reconstructions', 'tatra2013temp-noaa.txt'),
+  header = TRUE, 
+  comment.char = "#"
+)
+```
+
+```{r}
+#| label: prepare-figure-clim
+#| warning: false
+
+# --- 1. Jet Stream (Xu) ---
+Xu30 <- stats::filter(Xu$recon_EU_JSL, rep(1/30, 30), sides = 2)
+jet_panel <- ggplot(Xu, aes(x = Year)) +
+  geom_ribbon(aes(ymin = recon_EU_JSL_lower, ymax = recon_EU_JSL_upper),
+              fill = "lightblue", alpha = 0.4) +
+  geom_line(aes(y = recon_EU_JSL), color = "steelblue", size = 0.8, alpha = 0.7) +
+  geom_line(aes(y = Xu30), color = "darkblue", size = 1.2) +
+  scale_x_continuous(limits = c(1300, 1700), breaks = seq(1300, 1700, 100)) +
+  labs(title = "N Atlantic Jet Stream (Jul-Aug)", y = "JS Position", x = NULL) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(),
+        plot.title = element_text(size = 11, face = "bold")) +
+  xlim(1300, 1650)
+
+# --- 3. Büntgen 2021 (scPDSI) ---
+scpdsi_panel <- ggplot(scpdsi, aes(x = Year)) +
+  geom_ribbon(aes(ymin = scPDSI., ymax = scPDSI..1), fill = "skyblue", alpha = 0.4) +
+  geom_line(aes(y = scPDSI), color = "grey40", size = 0.4) +
+  geom_line(aes(y = scPDSI50yr), color = "red", size = 1) +
+  labs(title = "Central Europe Summer Drought (Büntgen et al. 2021)", y = "scPDSI", x = NULL) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(),
+        plot.title = element_text(size = 11, face = "bold")) +
+  xlim(1300, 1650)
+
+# --- 4. Büntgen 2011 (Precipitation + Temp) ---
+# Precipitation
+Bu30 <- stats::filter(buentgen11$Precipitation, rep(1/30, 30), sides = 2)
+
+precip_panel <- ggplot(buentgen11, aes(x = Year)) +
+  geom_ribbon(aes(ymin = P_lo, ymax = P_up), fill = "skyblue", alpha = 0.4) +
+  geom_line(aes(y = Precipitation), color = "grey40", size = 0.4) +
+  geom_line(aes(y = Bu30), color = "red", size = 1) +
+  labs(title = "Central Europe Precipitation (Büntgen et al. 2011)", y = "Precipitation", x = NULL) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(),
+        plot.title = element_text(size = 11, face = "bold")) +
+  xlim(1300, 1650)
+
+# Temperature
+Bu30b <- stats::filter(buentgen11$`Summer Temperature`, rep(1/30, 30), sides = 2)
+
+temp_panel <- ggplot(buentgen11, aes(x = Year)) +
+  geom_ribbon(aes(ymin = T_lo, ymax = T_up), fill = "skyblue", alpha = 0.4) +
+  geom_line(aes(y = `Summer Temperature`), color = "grey40", size = 0.4) +
+  geom_line(aes(y = Bu30b), color = "orange", size = 1) +
+  labs(title = "Central Europe Summer Temp (Büntgen et al. 2011)", y = "Temp", x = NULL) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(),
+        plot.title = element_text(size = 11, face = "bold")) +
+  xlim(1300, 1650)
+
+# --- 5. Linderholm 2015 (Scandinavia) ---
+Scandi30 <- stats::filter(Scandi15$temp, rep(1/30, 30), sides = 2)
+
+scandi_panel <- ggplot(Scandi15, aes(x = age_CE)) +
+  geom_ribbon(aes(ymin = temp., ymax = temp..1), fill = "skyblue", alpha = 0.4) +
+  geom_line(aes(y = temp), color = "steelblue", size = 0.3) +
+  geom_line(aes(y = Scandi30), color = "navy", size = 1) +
+  labs(title = "Fennoscandia Summer Temp (Linderholm et al. 2015)", y = "Anomaly", x = NULL) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(),
+        plot.title = element_text(size = 11, face = "bold")) +
+  xlim(1300, 1650)
+
+# --- 6. Büntgen 2013 (Eastern Europe) ---
+EE30 <- stats::filter(EastEU13$tempanom.MJ, rep(1/30, 30), sides = 2)
+
+eastEU_panel <- ggplot(EastEU13, aes(x = age_AD)) +
+  geom_line(aes(y = tempanom.MJ), color = "grey40", size = 0.4) +
+  geom_line(aes(y = EE30), color = "navy", size = 1) +
+  geom_line(aes(y = tempanom.MJ - 0.5), color = "grey80", linetype = "dotted") +
+  geom_line(aes(y = tempanom.MJ + 0.5), color = "grey80", linetype = "dotted") +
+  labs(title = "Eastern Europe May-June Temp (Büntgen et al. 2013)", y = "Anomaly", x = "Year CE") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold")) +
+  xlim(1300, 1650)
+
+# --- Combine everything ---
+combined_plot <- (
+  jet_panel /
+  scpdsi_panel /
+  precip_panel /
+  temp_panel /
+  scandi_panel /
+  eastEU_panel
+  
+) + plot_annotation(
+  title = "Climate in Europe (1300–1650 CE)",
+  subtitle = "Multi-proxy climate reconstructions and regional change (CHURN)",
+  caption = "Climnate data after: Sources: Xu 2024, Büntgen 2011, 2013, 2021, Linderholm 2015"
+)
+
+print(combined_plot)
+```
+
+```{r}
+
+politics_wide <- ranks_collapsed |>
+  select(Year, region, scaled_change) |>
+  pivot_wider(names_from = region, values_from = scaled_change)
+
+library(zoo)
+
+# Interpolate each region column
+politics_interp <- politics_wide[-1,] # remove 1300
+
+# ---- Interpolate all region columns (linear interpolation) ----
+
+# choose output years (change if you prefer a different range)
+out_years <- 1400:1650    # length = 251
+
+# region columns = all except Year
+regions <- setdiff(names(politics_interp), "Year")
+
+# safe interpolation: if a column has <2 non-NA points we return NA for all years
+interp_mat <- sapply(regions, function(col) {
+  y <- politics_interp[[col]]
+  if (sum(!is.na(y)) < 2) {
+    # not enough data to interpolate -> all NA
+    rep(NA_real_, length(out_years))
+  } else {
+    approx(x = politics_interp$Year, y = y, xout = out_years, rule = 2)$y
+    # rule = 2: extends edges using last/first known value. Use rule = 1 if you prefer NAs outside range.
+  }
+}, simplify = "matrix")
+
+# build final interpolated data.frame
+politics_interpolated <- data.frame(Year = out_years, as.data.frame(interp_mat, stringsAsFactors = FALSE))
+names(politics_interpolated)[-1] <- regions
+
+conflict_counts <- reg_conflict_df |>
+  group_by(region, Year_num) |>
+  summarise(n = n(), .groups = "drop") |>
+  complete(region, Year_num = 1300:1650, fill = list(n = 0)) |>
+  group_by(region) |>
+  mutate(density = stats::filter(n, rep(1/30, 30), sides = 2)) |>
+  ungroup()
+
+conflict_wide <- conflict_counts |>
+  select(Year_num, region, density) |>
+  pivot_wider(names_from = region, values_from = density)
+
+names(conflict_wide)[2:5] <- paste0('conflict_', names(conflict_wide)[2:5])
+  
+climate_df <- data.frame(
+  Year = 1300:1650,
+  jet = Xu30[match(1300:1650, Xu$Year)],
+  scpdsi = scpdsi$scPDSI50yr[match(1300:1650, scpdsi$Year)],
+  precip = Bu30[match(1300:1650, buentgen11$Year)],
+  temp = Bu30b[match(1300:1650, buentgen11$Year)],
+  scandi = Scandi30[match(1300:1650, Scandi15$age_CE)],
+  eastEU = EE30[match(1300:1650, EastEU13$age_AD)]
+)
+
+df_all <- climate_df |>
+  left_join(politics_interpolated, by = c("Year")) |>
+  left_join(conflict_wide, by = c("Year" = "Year_num"))
+
+df_clean <- na.omit(df_all)
+
+cors <- cor(df_clean[,-1], use = "pairwise.complete.obs", method = "spearman")
+round(cors, 2)
+
+
+```
+
+
+```{r}
+#| label: plot-churn
+
+political_panel <- ggplot(ranks_collapsed, aes(x = Year, y = scaled_change, color = region)) +
+  geom_line(size = 1.2, alpha = 0.8) +
+  scale_color_manual(
+    name = "Region",
+    values = c("dutch" = "#E31A1C",
+               "germanic" = "#1F78B4", 
+               "danish" = "#33A02C",
+               "slavic" = "#FF7F00",
+               "Global" = 'grey')
+  ) +
+  scale_x_continuous(limits = c(1400, 1650), breaks = seq(1400, 1650, 50)) +
+  scale_y_continuous(breaks = seq(.4, 1, .2)) +
+  ylim(.4, 1) +
+  labs(title = "Regional Political Changes (scaled)",
+       y = "Scaled Change",
+       x = "Year CE") +
+  theme_classic() +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor.x = element_line(color = "gray95", size = 0.3),
+    panel.grid.major.y = element_line(color = alpha("gray90", 0.7), size = 0.3),
+    plot.title = element_text(size = 11, face = "bold")
+  ) +
+  guides(color = guide_legend(nrow = 2, override.aes = list(size = 1.5)))
+```
+
+```{r}
+
+library(corrplot)
+library(reshape2)
+
+# --- 1. Merge everything on Year ---
+df_all <- climate_df %>%
+  left_join(politics_interpolated, by = "Year") %>%
+  left_join(conflict_wide, by = c("Year" = "Year_num"))
+
+# --- 2. Compute correlation matrix (Spearman is safer for non-normal time series) ---
+cors <- cor(df_all[,-1], use = "pairwise.complete.obs", method = "spearman")
+
+# --- 3. Visualise: Option A. Heatmap (corrplot) ---
+corrplot(cors, method = "color", type = "upper",
+         col = colorRampPalette(c("darkred","white","darkblue"))(200),
+         tl.col = "black", tl.srt = 45, addCoef.col = "black",
+         number.cex = .6, mar = c(0,0,2,0),
+         title = "Correlation matrix (Spearman)")
+
+# --- 4. Visualise: Option B. ggplot heatmap ---
+melted <- melt(cors, na.rm = TRUE)
+
+ggplot(melted, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "darkred", high = "darkblue", mid = "white",
+                       midpoint = 0, limit = c(-1,1)) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  labs(title = "Correlations among Climate, Politics, Conflict",
+       x = NULL, y = NULL, fill = "Spearman ρ")
+
+```
+```{r}
+
+ccf(df_clean$scpdsi, df_clean$dutch, lag.max = 50)
+
+library(zoo)
+
+years <- df_clean$Year
+
+roll_corrs <- lapply(
+  X = areas$region, 
+  FUN = function(region) {
+    tmp_x <- df_clean[[region]]
+    
+    tmp <- lapply(
+      X = colnames(df_clean)[-c(1,8:11)],
+      FUN = function(clim) {
+        tmp_y <- df_clean[[clim]]
+        
+        tmp_z <- zoo(cbind(tmp_x, tmp_y), order.by = years)
+        
+        # Rolling 50-year correlation (Spearman)
+        roll_cor <- rollapply(tmp_z, 
+                              width = 50,
+                              FUN = function(z) cor(z[,1], z[,2],                                                     method = "spearman", use = "pairwise"),
+                      by.column = FALSE, align = "center", fill = NA)
+      }
+    )
+  }
+)
+# Example: Dutch politics vs. conflict (replace with your actual columns)
+x <- df_clean$temp        # climate variable
+y <- df_clean$dutch     
+years <- df_clean$Year
+
+# Combine into zoo object
+z <- zoo(cbind(x, y), order.by = years)
+
+# Rolling 50-year correlation (Spearman)
+roll_cor <- rollapply(z, width = 50,
+                      FUN = function(z) cor(z[,1], z[,2], method = "spearman", use = "pairwise"),
+                      by.column = FALSE, align = "center", fill = NA)
+
+# Plot
+plot(years, roll_cor, type = "l", col = "steelblue", lwd = 2,
+     ylab = "Rolling Spearman correlation (50 yrs)",
+     xlab = "Year",
+     main = "Dutch: Climate vs CHURN (Rolling Correlation)")
+abline(h = 0, lty = 2, col = "grey")
+
+```
+
