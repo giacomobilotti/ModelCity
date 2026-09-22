@@ -16,9 +16,7 @@ __pycache__/
 .pytest_cache/
 .cache/
 
-# OS
+# Editor / OS
+.vscode/
 .DS_Store
 Thumbs.db
-
-# Optional: uncomment if you prefer regenerating plots instead of committing them
-# figures/
