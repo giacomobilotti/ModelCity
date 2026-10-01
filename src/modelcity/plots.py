@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
 
-from . import metrics
+from . import metrics, sampling
 from .settlements import Settlements
 from .theme import PALETTE, new_figure, style_axes, year_axis
 
@@ -26,6 +26,10 @@ __all__ = [
     "plot_size_summary",
     "plot_rank_size",
     "plot_urban_share",
+    "plot_site_growth",
+    "plot_trajectories",
+    "plot_period_growth",
+    "plot_persistence",
 ]
 
 
@@ -338,5 +342,197 @@ def plot_urban_share(
     year_axis(ax)
     ax.legend(frameon=False, loc="upper left", title="Threshold")
     ax.set_title("Weight of large centres over time")
+    fig.tight_layout()
+    return fig
+
+
+# -- chronological sampling --------------------------------------------------
+#
+# These take the frame returned by ``sampling.sample_trajectories`` rather than
+# a Settlements object.  Its ``attrs`` carry the size labels, which pandas
+# drops on some operations, so every label has a neutral fallback.
+
+_SKYBLUE = "#87CEEB"
+
+# Trajectory column and the site_summary column drawn as its median.
+_TRAJECTORY_VALUES = {"growth_cagr": "median", "growth_linear": "med_lin", "size": "size"}
+
+
+def _trajectory_noun(trajectories: pd.DataFrame) -> str:
+    return "city" if trajectories.attrs.get("size_type") == "population" else "site"
+
+
+def _one_site(trajectories: pd.DataFrame, site_id) -> pd.DataFrame:
+    site = trajectories[trajectories["id"].astype(str) == str(site_id)]
+    if site.empty:
+        raise ValueError("no trajectories for id {!r}.".format(site_id))
+    return site
+
+
+def _site_span(summary: pd.DataFrame) -> Tuple[float, float]:
+    return float(summary["t_start"].min()), float(summary["t_end"].max())
+
+
+def _r_limits(low: float, high: float) -> Tuple[float, float]:
+    """Widen limits by 4 percent each side, as R's default axis style does."""
+    pad = 0.04 * (high - low)
+    return low - pad, high + pad
+
+
+def plot_site_growth(
+    trajectories: pd.DataFrame,
+    site_id,
+    legend: bool = True,
+    figsize: Tuple[float, float] = (10.0, 7.5),
+) -> Figure:
+    """R's ``plot_site_cagr()``: median and mean CAGR of one settlement, with 50 and 95 percent bands.
+
+    Points sit at the median sampled date of each phase from
+    :func:`~modelcity.sampling.site_summary`.  As in R, the bands and the y
+    range leave out the earliest phase, whose median is missing because the
+    foundation falls in it, so a single-phase settlement cannot be drawn.
+    """
+    summary = sampling.site_summary(_one_site(trajectories, site_id))
+    if len(summary) < 2:
+        raise ValueError("id {!r} has a single phase, which leaves no growth band to plot.".format(site_id))
+    # site_summary lists the latest phase first, as R does, so the earliest is last.
+    body = summary.iloc[:-1].sort_values("year_median")
+    ordered = summary.sort_values("year_median")
+
+    fig, ax = new_figure(figsize=figsize)
+    ax.fill_between(
+        body["year_median"], body["q025"], body["q975"],
+        color=PALETTE["accent"], alpha=0.2, linewidth=0, label="95% CI",
+    )
+    ax.fill_between(
+        body["year_median"], body["q25"], body["q75"],
+        color=PALETTE["accent"], alpha=0.3, linewidth=0, label="50% CI",
+    )
+    ax.plot(ordered["year_median"], ordered["median"], color=PALETTE["accent"], linewidth=2, marker="o", label="Median")
+    ax.plot(ordered["year_median"], ordered["mean"], color=_SKYBLUE, linewidth=2, linestyle="--", label="Mean")
+    ax.axhline(0, linestyle="--", color="#1A1A1A", linewidth=1)
+
+    low, high = np.nanmin(body["q025"]), np.nanmax(body["q975"])
+    if np.isfinite(low) and np.isfinite(high) and high > low:
+        ax.set_ylim(*_r_limits(low, high))
+    ax.set_xlim(*_r_limits(*_site_span(summary)))
+    ax.set_ylabel("CAGR")
+    year_axis(ax)
+    if legend:
+        ax.legend(frameon=False, loc="upper left")
+    ax.set_title("Growth Rate for Site {}".format(site_id))
+    fig.tight_layout()
+    return fig
+
+
+def plot_trajectories(
+    trajectories: pd.DataFrame,
+    site_id,
+    value: str = "growth_cagr",
+    n: int = 50,
+    seed=1234,
+    xlim: Optional[Tuple[float, float]] = None,
+    ylim: Optional[Tuple[float, float]] = None,
+    figsize: Tuple[float, float] = (10.0, 7.5),
+) -> Figure:
+    """R's ``plot_spaghetti()``: ``n`` random draws of one settlement, with the median on top.
+
+    ``value`` is ``"growth_cagr"``, ``"growth_linear"`` or ``"size"`` (R's
+    ``"area"`` is accepted too).  The median line is the matching
+    :func:`~modelcity.sampling.site_summary` column, and dashed vertical lines
+    mark each phase start.  The default y range is R's: the data range
+    widened by a tenth of each limit.  ``xlim`` takes astronomical years.
+    """
+    value = "size" if value == "area" else value
+    if value not in _TRAJECTORY_VALUES:
+        raise ValueError(
+            "value must be 'growth_cagr', 'growth_linear' or 'size', got {!r}.".format(value)
+        )
+    site = _one_site(trajectories, site_id)
+    summary = sampling.site_summary(site)
+
+    draws = np.unique(site["iteration"])
+    rng = np.random.default_rng(seed)
+    chosen = rng.choice(draws, size=min(n, draws.size), replace=False)
+
+    fig, ax = new_figure(figsize=figsize)
+    for _, draw in site[site["iteration"].isin(chosen)].groupby("iteration"):
+        draw = draw.sort_values("year", kind="stable")
+        ax.plot(draw["year"], draw[value], color="#000000", alpha=0.2, linewidth=0.8)
+
+    if value != "size":
+        ax.axhline(0, linestyle="--", color="#808080", linewidth=1)
+    ordered = summary.sort_values("year_median")
+    ax.plot(ordered["year_median"], ordered[_TRAJECTORY_VALUES[value]], color=_SKYBLUE, linewidth=3)
+    for start in summary["t_start"]:
+        ax.axvline(start, linestyle="--", color="#000000", linewidth=0.75)
+
+    if ylim is None:
+        low, high = np.nanmin(site[value]), np.nanmax(site[value])
+        ylim = (low - 0.1 * low, high + 0.1 * high)
+    ax.set_xlim(*_r_limits(*(xlim if xlim is not None else _site_span(summary))))
+    ax.set_ylim(*_r_limits(*ylim))
+
+    label = trajectories.attrs.get("size_type", "size") if value == "size" else value
+    ax.set_ylabel(label)
+    year_axis(ax)
+    ax.set_title(
+        "Site {} {} trajectories ({} samples)".format(site_id, label.split("_")[0], len(chosen))
+    )
+    fig.tight_layout()
+    return fig
+
+
+def plot_period_growth(
+    trajectories: pd.DataFrame,
+    figsize: Tuple[float, float] = (10.0, 7.5),
+) -> Figure:
+    """Median CAGR per phase from :func:`~modelcity.sampling.period_summary`, with its 95 percent band."""
+    growth = sampling.period_summary(trajectories).sort_values("year_median")
+
+    fig, ax = new_figure(figsize=figsize)
+    ax.fill_between(
+        growth["year_median"], growth["q025"], growth["q975"],
+        color=PALETTE["accent"], alpha=0.2, linewidth=0, label="95% CI",
+    )
+    ax.plot(growth["year_median"], growth["median"], color=PALETTE["accent"], linewidth=2, marker="o", label="Median")
+    ax.axhline(0, linestyle="--", color="#1A1A1A", linewidth=1)
+    ax.set_ylabel("CAGR")
+    year_axis(ax)
+    ax.legend(frameon=False, loc="upper left")
+    ax.set_title("Median CAGR by period")
+    fig.tight_layout()
+    return fig
+
+
+def plot_persistence(
+    trajectories: pd.DataFrame,
+    terminus: float,
+    normalised: bool = False,
+    time_scale: Optional[str] = None,
+    figsize: Tuple[float, float] = (11.0, 7.0),
+) -> Figure:
+    """Median persistence to ``terminus`` of each settlement, with its 95 percent interval.
+
+    ``terminus`` and ``time_scale`` are as in
+    :func:`~modelcity.sampling.persistence_samples`.  One bar per settlement,
+    so subset ``trajectories`` first for large datasets.
+    """
+    summary = sampling.persistence_summary(trajectories, terminus, time_scale)
+    suffix = "_n" if normalised else ""
+    summary = summary.sort_values("median" + suffix, ascending=False).reset_index(drop=True)
+
+    median = summary["median" + suffix].to_numpy()
+    errors = np.vstack([median - summary["q025" + suffix], summary["q975" + suffix] - median])
+    positions = np.arange(len(summary))
+
+    fig, ax = new_figure(figsize=figsize)
+    ax.bar(positions, median, color=PALETTE["accent"], yerr=errors, capsize=3, ecolor="#404040")
+    ax.set_xticks(positions)
+    ax.set_xticklabels(summary["id"], rotation=90, fontsize=8)
+    ax.set_xlabel(_trajectory_noun(trajectories).capitalize())
+    ax.set_ylabel("Share of available time" if normalised else "Median persistence (years)")
+    ax.set_ylim(bottom=0)
+    ax.set_title("{} persistence to terminus {:g}".format(_trajectory_noun(trajectories).capitalize(), terminus))
     fig.tight_layout()
     return fig
