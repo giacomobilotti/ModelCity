@@ -14,6 +14,8 @@ They should not be used as templates for adapting a new dataset.
 | --- | --- | --- |
 | `scripts/r/run-plots.R` | CSV-based Yautepec plots, including trajectories and Sankey figures | Standalone replacement for parts of the original notebook |
 | `scripts/r/run-viabundus-plots.R` | Viabundus maps, regional summaries, alluvial plots, and rank trajectories | Uses approximations where upstream assets are absent |
+| `scripts/r/sampling.R`, `scripts/r/helpers_sampling.R` | Monte Carlo sampling of dates within phases, growth rates, and persistence | Ported to `modelcity.sampling`; see [Chronological sampling](chronological-sampling.md) |
+| `scripts/r/run-sampling-plots.R` | Runs the R sampling on Yautepec example sites into `figures/yautepec/sampling/` | Reference output for the Python port, which `scripts/run_sampling.py` runs on both datasets |
 | `notebooks/master-yautepec.qmd` | Original Yautepec survey manuscript analysis | Requires spatial data and assets not included here |
 | `notebooks/analyses.qmd` | Original Viabundus paper analysis | Requires upstream scripts and spatial, climate, and linguistic data |
 

@@ -96,8 +96,8 @@ With no occupied rows, `urban_share()` currently returns a columnless frame and
 
 ## Plots
 
-All plot functions accept a `Settlements` object as their first argument and
-return a `matplotlib.figure.Figure`.
+All plot functions in this section accept a `Settlements` object as their first
+argument and return a `matplotlib.figure.Figure`.
 
 - `plot_duration(settlements, bw=150.0, mark_peaks=True, figsize=(10, 7.5))`;
 - `plot_events(settlements, bw=150.0, figsize=(10, 7.5))`;
@@ -106,6 +106,30 @@ return a `matplotlib.figure.Figure`.
 - `plot_size_summary(settlements, figsize=(10, 7.5), log_scale=False)`;
 - `plot_rank_size(settlements, ncol=4, figsize=None)`;
 - `plot_urban_share(settlements, thresholds=None, figsize=(10, 7.5))`.
+
+## Chronological sampling
+
+Monte Carlo draws of foundation, peak and abandonment dates within phase
+bounds, reproducing the project's R sampling scripts. See
+[Chronological sampling](chronological-sampling.md).
+
+- `sample_trajectories(settlements, iterations=1000, *, start_method="unif",
+  end_method="unif", peak_method="unif", perc=5.0, peak_sd_perc=0.1,
+  terminus=None, initial_size=0.1, min_interval=1.0, seed=None)`;
+- `site_summary(trajectories)`;
+- `period_summary(trajectories)`;
+- `persistence_samples(trajectories, terminus, time_scale=None)`;
+- `persistence_summary(trajectories, terminus, time_scale=None)`;
+- `START_METHODS`, `END_METHODS`, `PEAK_METHODS`.
+
+Their plots take the trajectory frame, not a `Settlements` object:
+
+- `plot_site_growth(trajectories, site_id, legend=True, figsize=(10, 7.5))`;
+- `plot_trajectories(trajectories, site_id, value="growth_cagr", n=50,
+  seed=1234, xlim=None, ylim=None, figsize=(10, 7.5))`;
+- `plot_period_growth(trajectories, figsize=(10, 7.5))`;
+- `plot_persistence(trajectories, terminus, normalised=False, time_scale=None,
+  figsize=(11, 7))`.
 
 ### `save_figure(fig, path, dpi=150)`
 

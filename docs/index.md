@@ -14,6 +14,7 @@ settlement tables and applying a common set of metrics and plots.
 ## Reference
 
 - [Metrics and plots](metrics-and-plots.md)
+- [Chronological sampling](chronological-sampling.md)
 - [Python API](python-api.md)
 - [Reproducibility](reproducibility.md)
 

@@ -43,10 +43,24 @@ from .plots import (
     plot_churn,
     plot_duration,
     plot_events,
+    plot_period_growth,
+    plot_persistence,
     plot_rank_size,
+    plot_site_growth,
     plot_size_summary,
     plot_size_totals,
+    plot_trajectories,
     plot_urban_share,
+)
+from .sampling import (
+    END_METHODS,
+    PEAK_METHODS,
+    START_METHODS,
+    period_summary,
+    persistence_samples,
+    persistence_summary,
+    sample_trajectories,
+    site_summary,
 )
 from .schema import ALL_ROLES, OPTIONAL_ROLES, REQUIRED_ROLES, ColumnRoles, SchemaError
 from .settlements import SIZE_TYPES, Settlements, SizeSpec, TimeSpec, as_settlements
@@ -97,6 +111,19 @@ __all__ = [
     "plot_rank_size",
     "plot_urban_share",
     "save_figure",
+    # chronological sampling
+    "sample_trajectories",
+    "site_summary",
+    "period_summary",
+    "persistence_samples",
+    "persistence_summary",
+    "plot_site_growth",
+    "plot_trajectories",
+    "plot_period_growth",
+    "plot_persistence",
+    "START_METHODS",
+    "END_METHODS",
+    "PEAK_METHODS",
     # time helpers
     "bcad_to_bp",
     "bp_to_ce",
