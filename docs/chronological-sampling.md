@@ -144,3 +144,11 @@ differences beyond chance, the share of draws abandoned to zero and of missing
 growth rates match, and `summary_site()`, `summary_period()` and
 `persistence()` agree within Monte Carlo noise, including which medians are
 missing.
+
+## Longevity
+
+A settlement with `norm_pers` of 1 was still occupied at the terminus. That
+duration is right-censored. [Longevity](longevity.md) fits a survival model to
+the draws and imputes a total lifespan. The summary keeps the `norm_pers`
+from before that imputation, and `plot_longevity()` uses ggplot2's histogram
+edges.

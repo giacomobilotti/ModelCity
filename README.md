@@ -119,6 +119,8 @@ See [Adapting datasets](docs/adapting-datasets.md) for complete mapping recipes.
 - [End-to-end workflow](docs/workflow.md)
 - [Methodologies by stage](docs/methodologies.md)
 - [Metrics and plots](docs/metrics-and-plots.md)
+- [Chronological sampling](docs/chronological-sampling.md)
+- [Longevity](docs/longevity.md)
 - [Adapting new datasets](docs/adapting-datasets.md)
 - [Python API](docs/python-api.md)
 - [Reproducibility](docs/reproducibility.md)
@@ -157,7 +159,8 @@ pytest
 ```
 
 The tests cover schema validation, interval and snapshot normalization, time
-conversion, metrics, plotting, and integration with the included examples.
+conversion, metrics, plotting, chronological sampling, longevity, and
+integration with the included examples.
 
 ## Citation, license, and contact
 

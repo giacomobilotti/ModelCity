@@ -15,6 +15,7 @@ settlement tables and applying a common set of metrics and plots.
 
 - [Metrics and plots](metrics-and-plots.md)
 - [Chronological sampling](chronological-sampling.md)
+- [Longevity](longevity.md)
 - [Python API](python-api.md)
 - [Reproducibility](reproducibility.md)
 

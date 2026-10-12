@@ -16,6 +16,9 @@ They should not be used as templates for adapting a new dataset.
 | `scripts/r/run-viabundus-plots.R` | Viabundus maps, regional summaries, alluvial plots, and rank trajectories | Uses approximations where upstream assets are absent |
 | `scripts/r/sampling.R`, `scripts/r/helpers_sampling.R` | Monte Carlo sampling of dates within phases, growth rates, and persistence | Ported to `modelcity.sampling`; see [Chronological sampling](chronological-sampling.md) |
 | `scripts/r/run-sampling-plots.R` | Runs the R sampling on Yautepec example sites into `figures/yautepec/sampling/` | Reference output for the Python port, which `scripts/run_sampling.py` runs on both datasets |
+| `scripts/r/longevity_functions.R` | Censored survival fits, AIC comparison, generalised-gamma imputation, and a persistence summary of the stored normalised share | Survival functions ported to `modelcity.longevity`; see [Longevity](longevity.md). `dist_func()` is not ported |
+| `scripts/r/longevity.R` | Yautepec lifespan analysis: size class, soil, rivers, distance to large sites, and phase-count models | Project analysis. Needs `yautepec.gpkg`, which is not included. The survival steps are in the Python library |
+| `scripts/r/run-longevity-plots.R` | Runs the survival steps on `data/examples/yautepec.csv` into `figures/yautepec/longevity/` | Reference output for `scripts/run_longevity.py`, which writes `figures/yautepec/longevity-python/` |
 | `notebooks/master-yautepec.qmd` | Original Yautepec survey manuscript analysis | Requires spatial data and assets not included here |
 | `notebooks/analyses.qmd` | Original Viabundus paper analysis | Requires upstream scripts and spatial, climate, and linguistic data |
 

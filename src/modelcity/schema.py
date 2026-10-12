@@ -1,8 +1,8 @@
 """Column-role resolution and validation.
 
-Datasets name their columns differently: Yautepec calls the identifier ``Sitio``
-and the size measure ``Area``; Viabundus calls them ``Nodes_ID`` and
-``Inhabitants``.  Rather than force one naming convention, the caller maps
+Datasets name their columns differently: one table may call the identifier
+``site_id`` and the size measure ``area``, another ``city`` and
+``population``.  Rather than force one naming convention, the caller maps
 *roles* to whatever the columns happen to be called.
 
 Resolution is deliberately predictable: a role is satisfied either by an

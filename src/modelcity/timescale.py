@@ -3,8 +3,8 @@
 Three numberings are in play, and keeping them apart matters:
 
 *BP* counts backwards from 1950 CE.  It is the default for reading and for
-display, because both source datasets and the wider literature are quoted this
-way.
+display, because radiocarbon dates and much of the settlement literature are
+quoted this way.
 
 *Astronomical* numbering has a year zero, so ``1 BC`` is ``0`` and ``2 BC`` is
 ``-1``.  Differences between astronomical years are true elapsed spans, which is
@@ -83,7 +83,8 @@ def bcad_to_bp(x: ArrayLike, bc_to_bp: bool = True) -> np.ndarray:
     -----
     The R version reaches AD dates after 1950 through ``abs()``, which returns
     a positive BP value where a negative one is meant.  That is reproduced here
-    for parity; neither shipped dataset goes near the boundary.
+    for parity with the R function.  Dates after 1950 fall outside the range
+    this conversion is meant for.
     """
     values = np.atleast_1d(np.asarray(x, dtype=float))
     known = ~np.isnan(values)
@@ -230,11 +231,11 @@ def format_period(start: float, end: float, display: Optional[str] = None) -> st
 def snapshot_bounds(years: Sequence[float]) -> Dict[float, Tuple[float, float]]:
     """Turn observation years into contiguous intervals via midpoints.
 
-    Snapshot datasets record a settlement at discrete moments (Viabundus has
-    1300, 1400, 1500, 1550, 1600, 1650) rather than over explicit periods.  Each
-    observation is taken to represent the span halfway to its neighbours; the
-    first and last are extended outwards by half of their single neighbouring
-    gap so no part of the timeline is unassigned.
+    Snapshot datasets record a settlement at discrete moments, such as census
+    years, rather than over explicit periods.  Each observation is taken to
+    represent the span halfway to its neighbours; the first and last are
+    extended outwards by half of their single neighbouring gap so no part of
+    the timeline is unassigned.
     """
     unique = sorted({float(year) for year in years if np.isfinite(year)})
     if not unique:

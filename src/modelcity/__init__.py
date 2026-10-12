@@ -29,6 +29,16 @@ throughout, or ``year_display`` to switch for one figure:
 
 from __future__ import annotations
 
+from .longevity import (
+    SURVIVAL_DISTRIBUTIONS,
+    SurvivalFit,
+    compare_survival,
+    fit_persistence,
+    fit_survival,
+    impute_lifespan,
+    mark_censoring,
+    summarize_persistence,
+)
 from .metrics import (
     kde,
     rank_size,
@@ -43,6 +53,7 @@ from .plots import (
     plot_churn,
     plot_duration,
     plot_events,
+    plot_longevity,
     plot_period_growth,
     plot_persistence,
     plot_rank_size,
@@ -124,6 +135,16 @@ __all__ = [
     "START_METHODS",
     "END_METHODS",
     "PEAK_METHODS",
+    # longevity
+    "SURVIVAL_DISTRIBUTIONS",
+    "SurvivalFit",
+    "mark_censoring",
+    "fit_survival",
+    "compare_survival",
+    "fit_persistence",
+    "impute_lifespan",
+    "summarize_persistence",
+    "plot_longevity",
     # time helpers
     "bcad_to_bp",
     "bp_to_ce",
