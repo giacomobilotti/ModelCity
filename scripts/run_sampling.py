@@ -3,10 +3,10 @@
 Runs ``modelcity.sample_trajectories`` with the settings of the R sampling
 scripts and writes per-settlement growth and trajectory figures, period growth,
 persistence, and the matching summary tables in the column layout of the R
-output.  Yautepec mirrors ``scripts/r/run-sampling-plots.R``; Viabundus samples
-every city and plots a selection.
+output.  The area survey mirrors ``scripts/r/run-sampling-plots.R``; the
+population survey samples every settlement and plots a selection.
 
-Viabundus records population at census years rather than over phases, so each
+The population survey records size at census years rather than over phases, so each
 census is first read as the period ``as_settlements`` infers around it
 (1300 covers 1250-1350, and so on) and zero-population rows are dropped, since
 the sampling treats every row as an occupied phase.
@@ -94,7 +94,7 @@ class Run:
 
 #: Terminus values follow the R examples: the start of the last phase for
 #: sampling and its end for persistence, in each dataset's own time scale.
-#: Yautepec repeats ``scripts/r/run-sampling-plots.R`` so the two folders
+#: The area survey repeats ``scripts/r/run-sampling-plots.R`` so the two folders
 #: can be compared file by file.
 RUNS: Dict[str, Run] = {
     "yautepec": Run(

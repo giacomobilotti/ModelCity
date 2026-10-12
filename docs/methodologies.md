@@ -21,7 +21,9 @@ functions and the stage each belongs to.
 | Data preparation | Map columns, scale size, normalise time, build a canonical table | `DataFrame` + role mapping | `Settlements` |
 | Time helpers | Convert and label years; infer snapshot interval bounds | year values / display choice | arrays, strings, bounds |
 | Analysis | Compute summaries used for comparison across datasets | `Settlements` | pandas `DataFrame` |
-| Visualisation | Render analysis results as figures | `Settlements` | Matplotlib `Figure` |
+| Chronological sampling | Draw dates inside phase bounds and carry them through growth and persistence | interval `Settlements` | trajectory and summary tables |
+| Longevity | Fit censored lifespans and impute a total duration past the terminus | persistence samples | survival fits and an imputed summary |
+| Visualisation | Render analysis results as figures | `Settlements` or a result table | Matplotlib `Figure` |
 | Output | Persist figures and control axis labels | figure / display mode | file path / label text |
 
 ---
@@ -95,6 +97,33 @@ of the same name when you need graphics.
 
 Default urban thresholds come from `SizeSpec`: 20 and 40 ha for area data, or
 1000 and 2000 inhabitants for population data.
+
+---
+
+## Chronological sampling and longevity
+
+Both stages need interval records. Sampling draws foundation, peak and
+abandonment dates inside the phase bounds. Longevity starts from the resulting
+persistence table and treats a settlement still occupied at the terminus as
+right-censored.
+
+| Function | What it does |
+| --- | --- |
+| `sample_trajectories(settlements, iterations, ...)` | Monte Carlo dates, sizes and growth rates. |
+| `site_summary(trajectories)`, `period_summary(trajectories)` | Growth summaries by settlement and by phase. |
+| `persistence_samples(trajectories, terminus)` | Lifespan of each settlement in each draw, up to `terminus`. |
+| `persistence_summary(trajectories, terminus)` | Spread of those lifespans. Recomputes them from the dates. |
+| `mark_censoring(samples)` | `event` 0 when `norm_pers` is 1, otherwise 1. |
+| `fit_survival(...)`, `compare_survival(...)` | Parametric survival fits and their AIC ranking. |
+| `fit_persistence(samples, distribution="gengamma")` | One fit per Monte Carlo iteration. |
+| `impute_lifespan(longevity, mu, sigma, q, seed=1234)` | Total generalised-gamma lifespan, conditional on the observed duration. |
+| `summarize_persistence(samples)` | Year columns from the persistence in the table. The share columns average the stored `norm_pers`. |
+
+The rules, parameterisations and differences from R are in
+[Chronological sampling](chronological-sampling.md) and
+[Longevity](longevity.md). `plot_site_growth`, `plot_trajectories`,
+`plot_period_growth`, `plot_persistence` and `plot_longevity` draw these
+results.
 
 ---
 

@@ -35,10 +35,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "examples"
 FIGURES = ROOT / "figures"
 
-#: Viabundus stores geometry as the R printout of a coordinate pair.
+#: Some tables store geometry as the R printout of a coordinate pair.
 _POINT_PATTERN = re.compile(r"c\(\s*(-?[0-9.]+)\s*,\s*(-?[0-9.]+)\s*\)")
 
-#: The Viabundus geometry column is in ETRS89 / LAEA Europe.
+#: The bundled population table stores geometry in ETRS89 / LAEA Europe.
 VIABUNDUS_CRS = 3035
 
 
@@ -127,7 +127,7 @@ def _to_lonlat(x: pd.Series, y: pd.Series, crs: int) -> Optional[Tuple[pd.Series
 
 
 def read_yautepec(path, **kwargs) -> "mc.Settlements":
-    """Load the Yautepec survey: site areas in hectares, dated in years BP."""
+    """Load site areas in hectares, dated in years BP."""
     frame = pd.read_csv(path)
     options = dict(
         id="Sitio",
@@ -142,7 +142,7 @@ def read_yautepec(path, **kwargs) -> "mc.Settlements":
 
 
 def read_viabundus(path, assign_region: bool = True, **kwargs) -> "mc.Settlements":
-    """Load the Viabundus cities: inhabitants in thousands, snapshot years CE.
+    """Load cities whose inhabitants are stored in thousands, at snapshot years CE.
 
     Population is stored in thousands, so ``size_scale=1000`` brings it into
     real headcounts and makes the population thresholds directly meaningful.

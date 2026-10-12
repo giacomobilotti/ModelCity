@@ -230,8 +230,8 @@ def as_settlements(
         ``"BP"`` if ``start``/``end`` count backwards from 1950, ``"CE"`` if
         they are calendar years.
     size_scale:
-        Multiplier bringing ``size`` into real units.  Viabundus stores
-        thousands of inhabitants, so it passes ``size_scale=1000``.
+        Multiplier bringing ``size`` into real units.  A column stored in
+        thousands of inhabitants passes ``size_scale=1000``.
     size_unit:
         Overrides the default unit label (``ha`` or ``inhabitants``).
     drop_missing:

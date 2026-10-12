@@ -27,7 +27,7 @@ def isolate_year_display():
 
 @pytest.fixture
 def interval_frame() -> pd.DataFrame:
-    """A tiny Yautepec-shaped dataset: areas in hectares, dated in years BP."""
+    """A tiny interval dataset: areas in hectares, dated in years BP."""
     return pd.DataFrame(
         {
             "Sitio": ["A", "A", "B", "C"],
@@ -40,7 +40,7 @@ def interval_frame() -> pd.DataFrame:
 
 @pytest.fixture
 def snapshot_frame() -> pd.DataFrame:
-    """A tiny Viabundus-shaped dataset: populations recorded at set years."""
+    """A tiny snapshot dataset: populations recorded at set years."""
     return pd.DataFrame(
         {
             "Nodes_ID": [1, 1, 1, 2, 2, 2],

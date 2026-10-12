@@ -131,6 +131,26 @@ Their plots take the trajectory frame, not a `Settlements` object:
 - `plot_persistence(trajectories, terminus, normalised=False, time_scale=None,
   figsize=(11, 7))`.
 
+## Longevity
+
+Right-censored lifespans for settlements still occupied at the persistence
+terminus, reproducing `scripts/r/longevity_functions.R`. See
+[Longevity](longevity.md).
+
+- `mark_censoring(samples)`;
+- `fit_survival(longevity, event, distributions="all")`;
+- `compare_survival(longevity, event, distributions="all")`;
+- `fit_persistence(samples, distribution="gengamma")`;
+- `impute_lifespan(longevity, mu, sigma, q, seed=1234)`;
+- `summarize_persistence(samples)`;
+- `SURVIVAL_DISTRIBUTIONS`;
+- `SurvivalFit`.
+
+`plot_longevity(samples, coefficients=None, figsize=(10, 7.5))` takes the
+per-draw persistence table and bins it like `ggplot2::geom_histogram(bins = 40)`.
+`coefficients` is a mapping with Prentice `mu`, `sigma` and `Q`.
+`summarize_persistence()` averages the stored `norm_pers`, as `long_persistence()` does.
+
 ### `save_figure(fig, path, dpi=150)`
 
 Save a Matplotlib figure, creating parent directories as needed. Returns the

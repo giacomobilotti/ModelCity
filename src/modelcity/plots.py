@@ -8,13 +8,13 @@ population [inhabitants]" for a population one.
 from __future__ import annotations
 
 import math
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Mapping, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
 
-from . import metrics, sampling
+from . import longevity, metrics, sampling
 from .settlements import Settlements
 from .theme import PALETTE, new_figure, style_axes, year_axis
 
@@ -30,6 +30,7 @@ __all__ = [
     "plot_trajectories",
     "plot_period_growth",
     "plot_persistence",
+    "plot_longevity",
 ]
 
 
@@ -534,5 +535,207 @@ def plot_persistence(
     ax.set_ylabel("Share of available time" if normalised else "Median persistence (years)")
     ax.set_ylim(bottom=0)
     ax.set_title("{} persistence to terminus {:g}".format(_trajectory_noun(trajectories).capitalize(), terminus))
+    fig.tight_layout()
+    return fig
+
+
+def _r_modulo(values: np.ndarray, divisor: float) -> np.ndarray:
+    """R's ``%%``: the remainder has the sign of ``divisor``."""
+    return values - np.floor(values / divisor) * divisor
+
+
+def _r_seq(start: float, stop: float, step: float) -> np.ndarray:
+    """R's ``seq(start, stop, step)``, including the last step that does not pass ``stop``."""
+    count = int(math.floor((stop - start) / step + 1e-10))
+    return start + np.arange(count + 1) * step
+
+
+def _zero_range(low: float, high: float) -> bool:
+    """ggplot2's ``zero_range()``."""
+    if low == high:
+        return True
+    if not math.isfinite(low) or not math.isfinite(high):
+        return False
+    scale = min(abs(low), abs(high))
+    if scale == 0:
+        return False
+    return abs((low - high) / scale) < 1000 * np.finfo(float).eps
+
+
+def ggplot_histogram_breaks(values: np.ndarray, bins: int = 40) -> np.ndarray:
+    """Bin edges of ``ggplot2::geom_histogram(bins=bins)``.
+
+    With the default centre, the first edge sits half a bin below the shortest
+    value, so a peak at the left is split between the first two bars.
+    """
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        raise ValueError("no finite values to bin.")
+    if bins < 1:
+        raise ValueError("bins must be at least 1.")
+    low = float(finite.min())
+    high = float(finite.max())
+    boundary = None
+    if _zero_range(low, high):
+        width = 0.1
+    elif bins == 1:
+        width = high - low
+        boundary = low
+    else:
+        width = (high - low) / (bins - 1)
+        boundary = low - width / 2
+        ends = _r_modulo(np.array([low, high]), width)
+        if np.any(ends == _r_modulo(np.array([boundary]), width)):
+            width = (high - low) / bins
+    if boundary is None:
+        boundary = width / 2
+    shift = math.floor((low - boundary) / width)
+    origin = boundary + shift * width
+    max_x = high + (1 - 1e-08) * width
+    breaks = _r_seq(origin, max_x, width)
+    if breaks.size == 1:
+        breaks = np.array([breaks[0], breaks[0] + width])
+    return breaks
+
+
+def r_histogram_breaks(values: np.ndarray, bins: int = 40) -> np.ndarray:
+    """Bin edges of base R ``hist(x, breaks=bins)``, which calls ``pretty()``."""
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        raise ValueError("no finite values to bin.")
+    if bins < 1:
+        raise ValueError("bins must be at least 1.")
+    return _r_pretty(float(finite.min()), float(finite.max()), n=bins, min_n=1)
+
+
+def _r_pretty(low: float, high: float, n: int = 5, min_n: int = 1) -> np.ndarray:
+    """``pretty(c(low, high), n=n, min.n=min_n)`` from R's ``R_pretty``."""
+    high_u_bias = 1.5
+    u5_bias = 0.5 + 1.5 * high_u_bias
+    shrink = 0.75
+    f_min = 2.0**-20
+    rounding_eps = 1e-10
+    lo = low
+    up = high
+    span = up - lo
+    if span == 0 and up == 0:
+        cell = 1.0
+        small = True
+    else:
+        cell = max(abs(lo), abs(up))
+        unit_bias = 1 + (1 / (1 + high_u_bias) if u5_bias >= 1.5 * high_u_bias + 0.5 else 1.5 / (1 + u5_bias))
+        unit_bias *= max(1, n) * np.finfo(float).eps
+        small = span < cell * unit_bias * 3
+    if small:
+        if cell > 10:
+            cell = 9 + cell / 10
+        cell *= shrink
+        if min_n > 1:
+            cell /= min_n
+    else:
+        cell = span
+        if math.isfinite(span):
+            if n > 1:
+                cell /= n
+        else:
+            cell = up / n - lo / n
+    tiny = f_min * np.finfo(float).tiny
+    if tiny == 0:
+        tiny = np.finfo(float).tiny
+    if cell < tiny:
+        cell = tiny
+    elif cell > np.finfo(float).max / 1.25:
+        cell = np.finfo(float).max / 1.25
+    base = 10 ** math.floor(math.log10(cell))
+    unit = base
+    candidate = 2 * base
+    if candidate - cell < high_u_bias * (cell - unit):
+        unit = candidate
+        candidate = 5 * base
+        if candidate - cell < u5_bias * (cell - unit):
+            unit = candidate
+            candidate = 10 * base
+            if candidate - cell < high_u_bias * (cell - unit):
+                unit = candidate
+    steps_below = math.floor(lo / unit + rounding_eps)
+    steps_above = math.ceil(up / unit - rounding_eps)
+    while steps_below * unit > lo + rounding_eps * unit:
+        steps_below -= 1
+    while not math.isfinite(steps_below * unit):
+        steps_below += 1
+    while steps_above * unit < up - rounding_eps * unit:
+        steps_above += 1
+    while not math.isfinite(steps_above * unit):
+        steps_above -= 1
+    intervals = int(0.5 + steps_above - steps_below)
+    if intervals < min_n:
+        extra = min_n - intervals
+        if lo == 0 and steps_below == 0 and up != 0:
+            steps_above += extra
+        elif up == 0 and steps_above == 0 and lo != 0:
+            steps_below -= extra
+        elif steps_below >= 0:
+            steps_above += extra // 2
+            steps_below -= extra // 2 + extra % 2
+        else:
+            steps_below -= extra // 2
+            steps_above += extra // 2 + extra % 2
+        intervals = min_n
+    if steps_below * unit < lo:
+        lo = steps_below * unit
+    if steps_above * unit > up:
+        up = steps_above * unit
+    edges = np.linspace(lo, up, intervals + 1)
+    if intervals:
+        delta = abs(up - lo) / intervals
+        edges[np.abs(edges) < 1e-14 * delta] = 0
+    return edges
+
+
+def plot_longevity(
+    samples: pd.DataFrame,
+    coefficients: Optional[Mapping] = None,
+    figsize: Tuple[float, float] = (10.0, 7.5),
+) -> Figure:
+    """Density of persistence draws, with the fitted generalised gamma when given.
+
+    ``coefficients`` supplies Prentice ``mu``, ``sigma`` and ``Q``, usually the
+    means of :func:`modelcity.longevity.fit_persistence`.  The curve is the
+    latent lifespan density; the bars include draws that were still occupied
+    at the terminus, so the two need not peak in the same place.  The forty
+    bins use the same edges as ``ggplot2::geom_histogram(bins = 40)``.
+    """
+    if "persistence" not in samples.columns:
+        raise ValueError("samples must contain persistence.")
+    values = samples["persistence"].to_numpy(dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        raise ValueError("samples has no finite persistence values to plot.")
+
+    fig, ax = new_figure(figsize=figsize)
+    ax.hist(
+        values,
+        bins=ggplot_histogram_breaks(values, bins=40),
+        density=True,
+        color=PALETTE["band"],
+        edgecolor="white",
+        alpha=0.9,
+        label="Draws",
+    )
+    if coefficients is not None:
+        missing = [name for name in ("mu", "sigma", "Q") if name not in coefficients]
+        if missing:
+            raise ValueError("coefficients must include {}.".format(", ".join(missing)))
+        grid = np.linspace(max(values.min(), 1e-6), values.max(), 400)
+        distribution = longevity._prentice_gengamma(
+            float(coefficients["mu"]), float(coefficients["sigma"]), float(coefficients["Q"])
+        )
+        ax.plot(grid, distribution.pdf(grid), color=PALETTE["primary"], linewidth=2, label="Generalised gamma")
+        ax.legend(frameon=False)
+    ax.set_xlabel("Persistence (years)")
+    ax.set_ylabel("Density")
+    ax.set_title("Site persistence")
     fig.tight_layout()
     return fig
