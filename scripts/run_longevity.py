@@ -1,23 +1,30 @@
-"""Longevity of the bundled area survey, after chronological sampling.
+"""Longevity of the example datasets, after chronological sampling.
 
-Draws foundation and abandonment dates for every site, fits a generalised gamma
-to each iteration's censored lifespans, and imputes a total lifespan where the
-site was still occupied at 431 BP.  Figures and tables go to
-``figures/yautepec/longevity-python/``.  They follow
-``scripts/r/run-longevity-plots.R``: the same site list, 1000 iterations and
-the same terminus.  Draws come from NumPy, so individual imputations differ
-from the R run.  The fitted coefficients, the histogram bins, and the
-normalised share (taken before imputation) follow the R script.
+Draws foundation and abandonment dates, fits a generalised gamma to each
+iteration's censored lifespans, and imputes a total lifespan where the
+settlement was still occupied at the persistence terminus.  Figures and tables
+go to ``figures/<dataset>/longevity-python/``.
 
-The Large / Failed Large / Small labels are the survey rule from
-``longevity.R`` (10 ha, and a phase starting at 510 BP or later).  They are
-not part of the library.
+The area survey follows ``scripts/r/run-longevity-plots.R``: every site, 1000
+iterations, sampling to 510 BP and persistence to 431 BP.  Draws come from
+NumPy, so individual imputations differ from the R run.  The fitted
+coefficients, the histogram bins, and the normalised share (taken before
+imputation) follow the R script.  Large / Failed Large / Small labels are that
+survey's rule (10 ha, and a phase starting at 510 BP or later) and are not
+part of the library.
+
+The population survey uses the same phase reading as ``scripts/run_sampling.py``:
+each census is the period inferred around it, zero-population rows are dropped,
+sampling stops at 1625 CE and persistence is measured to 1675 CE.  It has no
+size-class figures.
 
     python scripts/run_longevity.py
+    python scripts/run_longevity.py --dataset viabundus
 """
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import matplotlib
@@ -32,12 +39,11 @@ from scipy import stats  # noqa: E402
 import modelcity as mc  # noqa: E402
 from modelcity.longevity import _prentice_gengamma
 from modelcity.plots import ggplot_histogram_breaks, r_histogram_breaks  # noqa: E402
-from run_unified import DATA, FIGURES, ROOT, read_yautepec  # noqa: E402
+from run_sampling import census_phases  # noqa: E402
+from run_unified import DATA, FIGURES, ROOT, read_viabundus, read_yautepec  # noqa: E402
 
 ITERATIONS = 1000
 SEED = 42
-SAMPLE_TERMINUS = 510
-PERSISTENCE_TERMINUS = 431
 SIZE_COLOURS = {"Large": "#CD0000", "Failed Large": "#6CA6CD", "Small": "#008B00"}
 SIZE_ORDER = ("Large", "Failed Large", "Small")
 
@@ -175,18 +181,13 @@ def plot_boxplot(summary: pd.DataFrame):
     return figure
 
 
-def main() -> None:
-    source = DATA / "yautepec.csv"
-    settlements = read_yautepec(source)
-    destination = FIGURES / "yautepec" / "longevity-python"
+def run(settlements: mc.Settlements, destination: Path, sample_terminus: float, persistence_terminus: float, label) -> None:
     destination.mkdir(parents=True, exist_ok=True)
-    label = size_labels(source)
-
-    print("Sampling {} sites, {} iterations".format(settlements.n_settlements, ITERATIONS))
+    print("Sampling {} settlements, {} iterations".format(settlements.n_settlements, ITERATIONS))
     trajectories = mc.sample_trajectories(
-        settlements, ITERATIONS, terminus=SAMPLE_TERMINUS, seed=SEED
+        settlements, ITERATIONS, terminus=sample_terminus, seed=SEED
     )
-    samples = mc.mark_censoring(mc.persistence_samples(trajectories, terminus=PERSISTENCE_TERMINUS))
+    samples = mc.mark_censoring(mc.persistence_samples(trajectories, terminus=persistence_terminus))
     print(
         "Persistence rows: {}; censored: {}; observed ends: {}".format(
             len(samples),
@@ -229,23 +230,25 @@ def main() -> None:
         seed=1234,
     )
     summary = mc.summarize_persistence(imputed)
-    summary["size"] = pd.Categorical(summary["id"].map(label), categories=SIZE_ORDER, ordered=True)
     summary["foundation"] = mc.bcad_to_bp(summary["start"], bc_to_bp=False)
+    if label is not None:
+        summary["size"] = pd.Categorical(summary["id"].map(label), categories=SIZE_ORDER, ordered=True)
     summary.to_csv(destination / "persistence-by-site.csv", index=False)
 
-    by_size = (
-        summary.groupby("size", observed=True)
-        .agg(
-            mean_persistence=("mean", "mean"),
-            median_persistence=("mean", "median"),
-            q975=("mean", lambda values: values.quantile(0.975)),
-            q025=("mean", lambda values: values.quantile(0.025)),
-            n=("mean", "size"),
+    if label is not None:
+        by_size = (
+            summary.groupby("size", observed=True)
+            .agg(
+                mean_persistence=("mean", "mean"),
+                median_persistence=("mean", "median"),
+                q975=("mean", lambda values: values.quantile(0.975)),
+                q025=("mean", lambda values: values.quantile(0.025)),
+                n=("mean", "size"),
+            )
+            .reset_index()
         )
-        .reset_index()
-    )
-    by_size.to_csv(destination / "persistence-by-size.csv", index=False)
-    print(by_size.to_string(index=False))
+        by_size.to_csv(destination / "persistence-by-size.csv", index=False)
+        print(by_size.to_string(index=False))
 
     save(
         plot_against_foundation(
@@ -268,10 +271,23 @@ def main() -> None:
         destination,
         "norm-persistence-vs-foundation",
     )
-    save(plot_by_size(summary), destination, "persistence-vs-foundation-by-size")
-    save(plot_correlation(summary), destination, "persistence-correlation-by-size")
-    save(plot_boxplot(summary), destination, "persistence-boxplot-by-size")
+    if label is not None:
+        save(plot_by_size(summary), destination, "persistence-vs-foundation-by-size")
+        save(plot_correlation(summary), destination, "persistence-correlation-by-size")
+        save(plot_boxplot(summary), destination, "persistence-boxplot-by-size")
     print("Longevity figures written to {}".format(destination.relative_to(ROOT)))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Longevity figures for an example dataset.")
+    parser.add_argument("--dataset", choices=("yautepec", "viabundus"), default="yautepec")
+    args = parser.parse_args()
+    if args.dataset == "yautepec":
+        source = DATA / "yautepec.csv"
+        run(read_yautepec(source), FIGURES / "yautepec" / "longevity-python", 510, 431, size_labels(source))
+    else:
+        settlements = census_phases(read_viabundus(DATA / "viabundus.csv"))
+        run(settlements, FIGURES / "viabundus" / "longevity-python", 1625, 1675, None)
 
 
 if __name__ == "__main__":

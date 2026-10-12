@@ -113,16 +113,22 @@ not in this repository. The size labels are applied in
 [`scripts/run_longevity.py`](../scripts/run_longevity.py) only so the example
 figures can be compared with the R run.
 
-## Running on the example dataset
+## Running on the example datasets
 
 [`scripts/run_longevity.py`](../scripts/run_longevity.py) samples every
-Yautepec site for 1000 iterations, with the sampling terminus at 510 BP and
-persistence measured to 431 BP, and writes figures and tables to
-`figures/yautepec/longevity-python/`:
+settlement for 1000 iterations and writes figures and tables to
+`figures/<dataset>/longevity-python/`:
 
 ```bash
 python scripts/run_longevity.py
+python scripts/run_longevity.py --dataset viabundus
 ```
+
+Yautepec uses a sampling terminus of 510 BP and measures persistence to 431 BP.
+Viabundus is snapshot data, so the runner first reads each census as the period
+inferred around it, as [Chronological sampling](chronological-sampling.md)
+describes, then samples to 1625 CE and measures persistence to 1675 CE. The
+size-class figures are written for Yautepec only.
 
 [`scripts/r/run-longevity-plots.R`](../scripts/r/run-longevity-plots.R) writes
 the R counterparts to `figures/yautepec/longevity/`. Coefficients, the
