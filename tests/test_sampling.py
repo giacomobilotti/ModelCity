@@ -22,7 +22,7 @@ from modelcity import (
     plot_trajectories,
     sample_trajectories,
     site_summary,
-    to_bp,
+    ce_to_bp,
 )
 from run_unified import read_yautepec
 
@@ -49,7 +49,7 @@ def phased():
 
 def _bp(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.assign(
-        year_bp=to_bp(frame["year"]), start_bp=to_bp(frame["t_start"]), end_bp=to_bp(frame["t_end"])
+        year_bp=ce_to_bp(frame["year"]), start_bp=ce_to_bp(frame["t_start"]), end_bp=ce_to_bp(frame["t_end"])
     )
 
 

@@ -78,15 +78,12 @@ from .settlements import SIZE_TYPES, Settlements, SizeSpec, TimeSpec, as_settlem
 from .theme import save_figure
 from .timescale import (
     YEAR_DISPLAYS,
-    bcad_to_bp,
     bp_to_ce,
     ce_to_bp,
     format_period,
     format_year,
     get_year_display,
     set_year_display,
-    to_astronomical,
-    to_bp,
     year_display,
 )
 
@@ -146,11 +143,8 @@ __all__ = [
     "summarize_persistence",
     "plot_longevity",
     # time helpers
-    "bcad_to_bp",
     "bp_to_ce",
     "ce_to_bp",
-    "to_astronomical",
-    "to_bp",
     "format_year",
     "format_period",
     # year display, BP by default

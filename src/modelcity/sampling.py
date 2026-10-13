@@ -32,7 +32,7 @@ from scipy.special import ndtr, ndtri
 
 from .schema import SchemaError
 from .settlements import Settlements
-from .timescale import bp_to_ce, format_period, to_astronomical, to_bp
+from .timescale import _bcad_to_bp, bp_to_ce, ce_to_bp, format_period
 
 __all__ = [
     "START_METHODS",
@@ -67,7 +67,7 @@ def _method(value: str, allowed, role: str) -> str:
 
 
 def _terminus_bp(terminus: float, time_scale: str) -> float:
-    return float(terminus) if time_scale == "BP" else float(to_bp(terminus))
+    return float(terminus) if time_scale == "BP" else float(ce_to_bp(terminus))
 
 
 # -- samplers, all in years BP ----------------------------------------------
@@ -227,8 +227,8 @@ def sample_trajectories(
     blocks = {key: [] for key in ("site", "step", "event", "phase", "start", "end", "year", "size")}
 
     for index, (site_id, phases) in enumerate(data.groupby("id", sort=False)):
-        starts = to_bp(phases["t_start"].to_numpy(dtype=float))
-        ends = to_bp(phases["t_end"].to_numpy(dtype=float))
+        starts = ce_to_bp(phases["t_start"].to_numpy(dtype=float))
+        ends = ce_to_bp(phases["t_end"].to_numpy(dtype=float))
         sizes = phases["size"].to_numpy(dtype=float)
         k = len(starts)
 
@@ -287,9 +287,9 @@ def sample_trajectories(
             "step": joined["step"],
             "event": pd.Categorical.from_codes(joined["event"], categories=list(_EVENTS)),
             "phase": joined["phase"],
-            "t_start": to_astronomical(joined["start"]),
-            "t_end": to_astronomical(joined["end"]),
-            "year": to_astronomical(joined["year"]),
+            "t_start": bp_to_ce(joined["start"]),
+            "t_end": bp_to_ce(joined["end"]),
+            "year": bp_to_ce(joined["year"]),
             "size": joined["size"],
         }
     )
@@ -386,8 +386,8 @@ def _growth_statistics(grouped, keep_missing: bool) -> pd.DataFrame:
 
 def _with_r_years(trajectories: pd.DataFrame) -> pd.DataFrame:
     frame = trajectories[["id", "t_start", "t_end", "year", "size", "growth_cagr", "growth_linear"]].copy()
-    frame["year_bp"] = to_bp(frame["year"])
-    frame["year_bcad"] = bp_to_ce(frame["year_bp"])
+    frame["year_bp"] = ce_to_bp(frame["year"])
+    frame["year_bcad"] = _bcad_to_bp(frame["year_bp"], bc_to_bp=False)
     return frame
 
 
@@ -470,9 +470,9 @@ def persistence_samples(
         {
             "id": trajectories["id"].astype(str),
             "iteration": trajectories["iteration"],
-            "start_bp": to_bp(trajectories["t_start"]),
-            "end_bp": to_bp(trajectories["t_end"]),
-            "year_bp": to_bp(trajectories["year"]),
+            "start_bp": ce_to_bp(trajectories["t_start"]),
+            "end_bp": ce_to_bp(trajectories["t_end"]),
+            "year_bp": ce_to_bp(trajectories["year"]),
         }
     )
     frame = frame[frame["start_bp"] > terminus_bp]

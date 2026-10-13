@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from modelcity.timescale import (
-    bcad_to_bp,
+    _bcad_to_bp,
     bp_to_ce,
     ce_to_bp,
     format_period,
@@ -12,8 +12,6 @@ from modelcity.timescale import (
     get_year_display,
     set_year_display,
     snapshot_bounds,
-    to_astronomical,
-    to_bp,
     year_display,
 )
 
@@ -37,17 +35,17 @@ R_BP_TO_BCAD = [
 
 @pytest.mark.parametrize("bcad, expected_bp", R_BCAD_TO_BP)
 def test_bcad_to_bp_matches_r(bcad, expected_bp):
-    assert bcad_to_bp(bcad) == expected_bp
+    assert _bcad_to_bp(bcad) == expected_bp
 
 
 @pytest.mark.parametrize("bp, expected_bcad", R_BP_TO_BCAD)
 def test_bp_to_bcad_matches_r(bp, expected_bcad):
-    assert bcad_to_bp(bp, bc_to_bp=False) == expected_bcad
+    assert _bcad_to_bp(bp, bc_to_bp=False) == expected_bcad
 
 
 def test_conversion_runs_over_vectors_and_keeps_missing_values():
     """`NaN` passes through as `NA` does in R, rather than converting."""
-    result = bcad_to_bp(np.array([-1499, np.nan, 1500]))
+    result = _bcad_to_bp(np.array([-1499, np.nan, 1500]))
     assert result[0] == 3448
     assert np.isnan(result[1])
     assert result[2] == 450
@@ -55,31 +53,26 @@ def test_conversion_runs_over_vectors_and_keeps_missing_values():
 
 def test_year_zero_is_rejected_like_in_r():
     with pytest.raises(ValueError, match="0 BC/AD is not a valid year"):
-        bcad_to_bp(0)
+        _bcad_to_bp(0)
     with pytest.raises(ValueError, match="0 BC/AD is not a valid year"):
-        bcad_to_bp([-100, 0, 100])
+        _bcad_to_bp([-100, 0, 100])
 
 
 def test_post_bomb_dates_are_rejected_like_in_r():
     with pytest.raises(ValueError, match="Post-bomb dates"):
-        bcad_to_bp(-5, bc_to_bp=False)
+        _bcad_to_bp(-5, bc_to_bp=False)
 
 
-def test_named_wrappers_delegate_to_the_r_port():
-    assert ce_to_bp(-1499) == bcad_to_bp(-1499)
-    assert bp_to_ce(3449) == bcad_to_bp(3449, bc_to_bp=False)
+def test_historical_labels_skip_the_year_that_never_existed():
+    assert _bcad_to_bp(0, bc_to_bp=False) == 1950
+    assert _bcad_to_bp(1000, bc_to_bp=False) == 950
+    assert _bcad_to_bp(1950, bc_to_bp=False) == -1
+    assert _bcad_to_bp(1951, bc_to_bp=False) == -2
 
 
-def test_bp_to_ce_skips_the_year_that_never_existed():
-    assert bp_to_ce(0) == 1950
-    assert bp_to_ce(1000) == 950
-    assert bp_to_ce(1950) == -1
-    assert bp_to_ce(1951) == -2
-
-
-def test_bp_to_ce_round_trips():
+def test_historical_conversion_round_trips():
     values = np.array([0, 500, 1949, 1950, 2500, 3449])
-    assert np.allclose(ce_to_bp(bp_to_ce(values)), values)
+    assert np.allclose(_bcad_to_bp(_bcad_to_bp(values, bc_to_bp=False)), values)
 
 
 # -- the internal astronomical scale ----------------------------------------
@@ -91,30 +84,30 @@ def test_astronomical_years_preserve_elapsed_time():
     durations were computed on historical years, because of the missing zero.
     """
     start_bp, end_bp = 2049, 1751
-    span = to_astronomical(end_bp) - to_astronomical(start_bp)
+    span = bp_to_ce(end_bp) - bp_to_ce(start_bp)
     assert span == start_bp - end_bp == 298
 
-    # The historical numbering used for labels does differ, by exactly one year.
-    label_span = bp_to_ce(end_bp) - bp_to_ce(start_bp)
+    # The historical numbering used for R labels does differ, by exactly one year.
+    label_span = _bcad_to_bp(end_bp, bc_to_bp=False) - _bcad_to_bp(start_bp, bc_to_bp=False)
     assert label_span == 299
 
 
-def test_to_bp_inverts_to_astronomical_without_a_boundary_case():
+def test_ce_to_bp_inverts_bp_to_ce_without_a_boundary_case():
     values = np.array([0, 431, 1950, 3449, 5000])
-    assert np.allclose(to_bp(to_astronomical(values)), values)
+    assert np.allclose(ce_to_bp(bp_to_ce(values)), values)
     # Fractional midpoints survive, which the no-year-zero rule cannot promise.
-    assert to_bp(to_astronomical(3449.5)) == 3449.5
+    assert ce_to_bp(bp_to_ce(3449.5)) == 3449.5
 
 
 @pytest.mark.parametrize("bp", [431, 1751, 1949, 1950, 2049, 3449])
 def test_both_routes_to_bp_agree(bp):
     """Going through astronomical years must land where the R route lands.
 
-    The internal scale reaches BP by plain subtraction while the R conversion
+    The stored scale reaches BP by plain subtraction while the R conversion
     steps over the missing year zero; they have to agree, or stored years and
     published labels would describe different dates.
     """
-    assert to_bp(to_astronomical(bp)) == ce_to_bp(bp_to_ce(bp)) == bp
+    assert ce_to_bp(bp_to_ce(bp)) == _bcad_to_bp(_bcad_to_bp(bp, bc_to_bp=False)) == bp
 
 
 # -- display scale ----------------------------------------------------------

@@ -145,13 +145,11 @@ settlements = mc.as_settlements(
 )
 ```
 
-Document the conversion and retain the original date column. For historical BC
-input, remember that ModelCity's internal arithmetic uses astronomical years
-with a year zero. The helpers `bcad_to_bp()` and `to_astronomical()` can be
-combined when an explicit conversion is needed. The compatibility
-`bcad_to_bp()`/`ce_to_bp()` implementation reproduces an original R behavior
-that gives incorrect positive BP values for dates after 1950 CE; convert modern
-dates directly instead.
+Document the conversion and retain the original date column. Years passed with
+`time_scale="CE"` are astronomical: 1 BC is 0 and 2 BC is −1. Historical BC/AD
+has no year zero, so a historical date before the current era is one year lower
+than the astronomical year. Shift those dates before calling `ce_to_bp()`, or
+pass years BP and use `bp_to_ce()`.
 
 ## Cleaning missing and duplicate values
 

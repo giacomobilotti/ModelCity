@@ -102,7 +102,7 @@ Summary columns keep R's names and units: `med_year` in BC/AD, and
   zero-length exponential span, on which R stops with an error, gives a delay
   of zero.
 - **Years in the trajectory frame** are astronomical, like the rest of the
-  package. Convert with `mc.to_bp()`.
+  package. Convert with `mc.ce_to_bp()`.
 - **Site identifiers** are strings. Summaries order them numerically when all
   are numbers and as text otherwise, as R does for integer or character IDs.
 

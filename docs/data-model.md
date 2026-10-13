@@ -173,10 +173,8 @@ If source dates use negative historical BC notation, convert them deliberately
 instead of assuming the no-year-zero correction will happen during
 normalization.
 
-Useful helpers include `to_astronomical()`, `to_bp()`, `bcad_to_bp()`,
-`bp_to_ce()`, and `ce_to_bp()`. The historical conversion helpers preserve
-parity with the original R function and incorrectly turn post-1950 CE dates
-into positive BP values; do not use them for modern dates after 1950.
+`bp_to_ce()` and `ce_to_bp()` convert between years BP and those stored
+astronomical years. `format_year()` writes BC/AD labels from the stored years.
 `settlements.years_bp()` produces a copy of the canonical table with readable
 BP columns for export.
 

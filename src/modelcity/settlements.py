@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from .schema import ColumnRoles, SchemaError, resolve_roles
-from .timescale import format_period, format_year, snapshot_bounds, to_astronomical, to_bp
+from .timescale import bp_to_ce, ce_to_bp, format_period, format_year, snapshot_bounds
 
 __all__ = [
     "Settlements",
@@ -159,10 +159,10 @@ class Settlements:
         because differences between them are true elapsed spans.
         """
         frame = self.data.copy()
-        frame.insert(frame.columns.get_loc("t_start"), "start_bp", to_bp(frame["t_start"]))
-        frame.insert(frame.columns.get_loc("t_end"), "end_bp", to_bp(frame["t_end"]))
+        frame.insert(frame.columns.get_loc("t_start"), "start_bp", ce_to_bp(frame["t_start"]))
+        frame.insert(frame.columns.get_loc("t_end"), "end_bp", ce_to_bp(frame["t_end"]))
         if "t_observed" in frame.columns:
-            frame["observed_bp"] = to_bp(frame["t_observed"])
+            frame["observed_bp"] = ce_to_bp(frame["t_observed"])
         return frame
 
     def with_data(self, data: pd.DataFrame) -> "Settlements":
@@ -288,8 +288,8 @@ def as_settlements(
     raw_end = _require_numeric(data, roles.end, "end") if roles.has_end else None
 
     if time_scale == "BP":
-        start_years = to_astronomical(raw_start)
-        end_years = to_astronomical(raw_end) if raw_end is not None else None
+        start_years = bp_to_ce(raw_start)
+        end_years = bp_to_ce(raw_end) if raw_end is not None else None
     else:
         start_years = raw_start.to_numpy(dtype=float)
         end_years = raw_end.to_numpy(dtype=float) if raw_end is not None else None

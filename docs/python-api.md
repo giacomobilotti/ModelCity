@@ -158,24 +158,12 @@ destination as a string.
 
 ## Time conversion
 
-### Arithmetic scales
+- `bp_to_ce(bp)`: years BP to astronomical calendar years (`1950 − bp`);
+- `ce_to_bp(year)`: astronomical calendar years back to years BP.
 
-- `to_astronomical(bp)`: BP to astronomical calendar years;
-- `to_bp(year)`: astronomical calendar years to BP.
-
-Use these linear conversions for calculations.
-
-### Historical BC/AD compatibility
-
-- `bcad_to_bp(x, bc_to_bp=True)`: conversion compatible with the project's R
-  implementation;
-- `ce_to_bp(ce)`: historical BC/AD to BP;
-- `bp_to_ce(bp)`: BP to historical BC/AD values for labels.
-
-Historical BC/AD has no year zero. Astronomical numbering does.
-These helpers intentionally match the project's original R conversion,
-including its incorrect positive-BP result for post-1950 CE dates. Do not use
-`bcad_to_bp()` or `ce_to_bp()` for those modern dates.
+These are the only conversions. Stored dates use astronomical years, which
+include a year zero, so a difference is an elapsed span. `format_year()` and
+`format_period()` turn those stored years into BP or BC/AD labels.
 
 ### Formatting
 

@@ -31,11 +31,8 @@ import pandas as pd
 __all__ = [
     "BP_REFERENCE",
     "YEAR_DISPLAYS",
-    "bcad_to_bp",
     "bp_to_ce",
     "ce_to_bp",
-    "to_astronomical",
-    "to_bp",
     "format_year",
     "format_period",
     "get_year_display",
@@ -55,15 +52,32 @@ ArrayLike = Union[float, int, Sequence[float], np.ndarray, pd.Series]
 _year_display = "BP"
 
 
-# -- the R conversion, ported ----------------------------------------------
+# -- BP and astronomical CE ------------------------------------------------
 
-def bcad_to_bp(x: ArrayLike, bc_to_bp: bool = True) -> np.ndarray:
-    """Convert between BC/AD and BP, following the project's R implementation.
+def bp_to_ce(bp: ArrayLike) -> np.ndarray:
+    """Years BP to astronomical calendar years.
 
-    This is a direct port of the ``bcad_to_bp()`` used alongside the R scripts,
-    which merges ``rcarbon::BCADtoBP`` and ``rcarbon::BPtoBCAD`` into one
-    function and drops the upper guard on AD dates.  Both directions keep the
-    no-year-zero rule, so ``1 BC`` is 1950 BP and ``1 AD`` is 1949 BP.
+    ``bp_to_ce(bp)`` is ``1950 - bp``.  Year 0 is 1 BC, so a difference between
+    two results is the elapsed span, including across the BC/AD boundary.
+    BC/AD labels, which have no year zero, come from :func:`format_year`.
+    """
+    return BP_REFERENCE - np.asarray(bp, dtype=float)
+
+
+def ce_to_bp(year: ArrayLike) -> np.ndarray:
+    """Astronomical calendar years to years BP, inverting :func:`bp_to_ce`.
+
+    Fractional years, such as period midpoints, stay exact.
+    """
+    return BP_REFERENCE - np.asarray(year, dtype=float)
+
+
+def _bcad_to_bp(x: ArrayLike, bc_to_bp: bool = True) -> np.ndarray:
+    """Historical BC/AD and BP, matching the R ``bcad_to_bp()`` used for labels.
+
+    Summary columns that quote R keep this numbering, which has no year zero:
+    ``1 BC`` is 1950 BP and ``1 AD`` is 1949 BP.  Calculations use
+    :func:`bp_to_ce` and :func:`ce_to_bp` instead.
 
     Parameters
     ----------
@@ -106,41 +120,6 @@ def bcad_to_bp(x: ArrayLike, bc_to_bp: bool = True) -> np.ndarray:
         result[ancient] = (BP_REFERENCE - 1) - values[ancient]
 
     return result if np.ndim(x) else result[0]
-
-
-def ce_to_bp(ce: ArrayLike) -> np.ndarray:
-    """Historical BC/AD years to years BP.  Calls :func:`bcad_to_bp`."""
-    return bcad_to_bp(ce, bc_to_bp=True)
-
-
-def bp_to_ce(bp: ArrayLike) -> np.ndarray:
-    """Years BP to historical BC/AD years.  Calls :func:`bcad_to_bp`.
-
-    Intended for labelling; prefer :func:`to_astronomical` when the result will
-    be used in a calculation.
-    """
-    return bcad_to_bp(bp, bc_to_bp=False)
-
-
-# -- the internal linear scale ----------------------------------------------
-
-def to_astronomical(bp: ArrayLike) -> np.ndarray:
-    """Years BP to astronomical calendar years, keeping a year zero.
-
-    Use this for arithmetic.  ``to_astronomical(2049) - to_astronomical(1751)``
-    gives 298 years, matching the plain difference of the BP values.
-    """
-    return BP_REFERENCE - np.asarray(bp, dtype=float)
-
-
-def to_bp(year: ArrayLike) -> np.ndarray:
-    """Astronomical calendar years back to years BP, inverting :func:`to_astronomical`.
-
-    Unlike :func:`ce_to_bp` this takes astronomical years, so it needs no
-    year-zero correction and stays exact for fractional values such as period
-    midpoints.
-    """
-    return BP_REFERENCE - np.asarray(year, dtype=float)
 
 
 # -- display scale ----------------------------------------------------------

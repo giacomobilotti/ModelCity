@@ -38,6 +38,7 @@ from scipy import stats  # noqa: E402
 
 import modelcity as mc  # noqa: E402
 from modelcity.longevity import _prentice_gengamma
+from modelcity.timescale import _bcad_to_bp
 from modelcity.plots import ggplot_histogram_breaks, r_histogram_breaks  # noqa: E402
 from run_sampling import census_phases  # noqa: E402
 from run_unified import DATA, FIGURES, ROOT, read_viabundus, read_yautepec  # noqa: E402
@@ -230,7 +231,8 @@ def run(settlements: mc.Settlements, destination: Path, sample_terminus: float, 
         seed=1234,
     )
     summary = mc.summarize_persistence(imputed)
-    summary["foundation"] = mc.bcad_to_bp(summary["start"], bc_to_bp=False)
+    # This axis matches the R plots, which count BC/AD without a year zero.
+    summary["foundation"] = _bcad_to_bp(summary["start"], bc_to_bp=False)
     if label is not None:
         summary["size"] = pd.Categorical(summary["id"].map(label), categories=SIZE_ORDER, ordered=True)
     summary.to_csv(destination / "persistence-by-site.csv", index=False)

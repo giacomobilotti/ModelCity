@@ -199,8 +199,8 @@ def r_layout(table: pd.DataFrame, names: pd.Series, size_type: str) -> pd.DataFr
     """
     frame = table.drop(columns=["label", "year_median"], errors="ignore")
     if "t_start" in frame.columns:
-        frame["t_start"] = mc.to_bp(frame["t_start"])
-        frame["t_end"] = mc.to_bp(frame["t_end"])
+        frame["t_start"] = mc.ce_to_bp(frame["t_start"])
+        frame["t_end"] = mc.ce_to_bp(frame["t_end"])
     frame = frame.rename(columns={"t_start": "start", "t_end": "end", "size": size_type})
     if "id" in frame.columns:
         labels = frame["id"].map(names)

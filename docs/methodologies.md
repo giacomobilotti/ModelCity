@@ -54,16 +54,13 @@ upstream of this stage.
 
 ## Time helpers
 
-Supporting utilities for dates. Some run inside data preparation (`to_astronomical`,
+Supporting utilities for dates. Some run inside data preparation (`bp_to_ce`,
 snapshot bounds); others only affect display labels.
 
 | Function | What it does |
 | --- | --- |
-| `to_astronomical(bp)` | Converts years BP to astronomical calendar years (`year = 1950 − bp`) for internal arithmetic. |
-| `to_bp(year)` | Inverse of `to_astronomical`. |
-| `bcad_to_bp(x, ...)` | Historical BC/AD ↔ BP conversion matching the project’s R helper (no year zero; R-compatible post-1950 quirk). |
-| `ce_to_bp(ce)` | Alias path through `bcad_to_bp` for calendar-year inputs. |
-| `bp_to_ce(bp)` | Inverse historical conversion from BP to BC/AD labels. |
+| `bp_to_ce(bp)` | Converts years BP to astronomical calendar years (`year = 1950 − bp`) for arithmetic. |
+| `ce_to_bp(year)` | Inverse of `bp_to_ce`. |
 | `format_year(value, ...)` | Formats one year for display as BP or BC/AD without changing stored values. |
 | `format_period(start, end, ...)` | Formats a period label, collapsing a shared era suffix when possible. |
 | `get_year_display()` / `set_year_display(display)` | Reads or sets the global label mode (`BP` default, or `BCAD`). |
