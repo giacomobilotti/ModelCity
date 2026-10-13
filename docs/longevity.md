@@ -6,13 +6,28 @@ as a measured abandonment. Longevity treats that draw as right-censored, fits
 parametric survival models to the durations, and samples a total lifespan for
 the censored rows from a generalised gamma.
 
-The functions live in `modelcity.longevity`, are exported from `modelcity`, and
-reproduce the reusable part of
+This is one of the three ModelCity analyses. It follows
+[chronological sampling](chronological-sampling.md); the system-level figures
+are in [Metrics and plots](metrics-and-plots.md). The functions live in
+`modelcity.longevity`, are exported from `modelcity`, and reproduce the
+reusable part of
 [`scripts/r/longevity_functions.R`](../scripts/r/longevity_functions.R). They
 take the table from `persistence_samples()`; snapshot data never reaches them
 because `sample_trajectories()` rejects it. The hazard families are those
 compared by Scheffer et al., *The vulnerability of aging states* (PNAS 2023,
 [10.1073/pnas.2218834120](https://doi.org/10.1073/pnas.2218834120)).
+
+[`scripts/run_longevity.py`](../scripts/run_longevity.py) runs the analysis on
+the example datasets and writes `figures/<dataset>/longevity-python/`. It
+runs Yautepec unless `--dataset` names another survey:
+
+```bash
+python scripts/run_longevity.py
+python scripts/run_longevity.py --dataset viabundus
+```
+
+Settings for those runs are under
+[Running on the example datasets](#running-on-the-example-datasets).
 
 ```python
 import modelcity as mc

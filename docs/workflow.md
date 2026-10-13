@@ -1,7 +1,7 @@
 # End-to-end workflow
 
 The reusable ModelCity workflow has one source-specific step—loading and
-mapping a table—and a shared analytical path after normalization.
+mapping a table—and three shared analyses after normalization.
 
 ```text
 load source data
@@ -12,13 +12,20 @@ load source data
              ↓
  inspect canonical data and assumptions
              ↓
- calculate DataFrame metrics     ← analysis
-             ↓
- create and save Matplotlib figures  ← visualisation / output
+     ┌───────────────────┼────────────────────┐
+ system metrics      chronological         longevity
+ and plots           sampling              (from the
+ (any record type)   (interval records)    persistence draws)
 ```
 
 A function-by-function map of these stages is in
-[Methodologies by stage](methodologies.md).
+[Methodologies by stage](methodologies.md). The three analyses are documented
+in [Metrics and plots](metrics-and-plots.md),
+[Chronological sampling](chronological-sampling.md), and
+[Longevity](longevity.md). Each has a runner for the included example
+datasets: [`scripts/run_unified.py`](../scripts/run_unified.py),
+[`scripts/run_sampling.py`](../scripts/run_sampling.py), and
+[`scripts/run_longevity.py`](../scripts/run_longevity.py).
 
 ## 1. Load a DataFrame
 
@@ -121,9 +128,12 @@ Confirm that:
 `group` is descriptive metadata in the current API. Metrics do not facet by it,
 and duration output retains only the first group encountered per settlement.
 
-## 4. Calculate metrics first
+## 4. System metrics
 
-All analytical functions return DataFrames:
+This analysis summarises the settlement system directly from the canonical
+table. It accepts interval and snapshot records.
+
+The metric functions return DataFrames:
 
 ```python
 durations = mc.settlement_duration(settlements)
@@ -150,7 +160,7 @@ Choose kernel bandwidths and large-centre thresholds based on the temporal
 resolution, units, and research question. Defaults provide comparable behavior;
 they are not universal substantive definitions.
 
-## 5. Create figures
+## 5. System-metric figures
 
 Each plot function accepts the same `Settlements` object and returns a
 Matplotlib `Figure`:
@@ -191,9 +201,86 @@ with mc.year_display("BCAD"):
 The display setting changes tick and period labels only. Dates remain
 astronomical internally, and calculated values do not move.
 
-## 7. Turn the workflow into a project script
+## 7. Sample dates within phases
 
-Keep loading separate from shared analysis:
+Phase bounds leave the foundation, peak, and abandonment dates free inside
+each occupied interval. Chronological sampling draws those dates many times
+and carries every draw through size, growth, and persistence. The functions
+require interval records.
+
+```python
+ITERATIONS = 1000
+SEED = 42
+SAMPLE_TERMINUS = 510
+PERSISTENCE_TERMINUS = 431
+
+trajectories = mc.sample_trajectories(
+    settlements,
+    ITERATIONS,
+    terminus=SAMPLE_TERMINUS,
+    seed=SEED,
+)
+by_site = mc.site_summary(trajectories)
+by_period = mc.period_summary(trajectories)
+persistence = mc.persistence_summary(
+    trajectories, terminus=PERSISTENCE_TERMINUS
+)
+```
+
+`terminus` is in the dataset's own time scale. Give the sampling terminus and
+the persistence terminus separately: the examples use the start of the last
+phase for sampling and its end for persistence.
+
+Figures take the trajectory frame:
+
+```python
+site_id = settlements.data["id"].iloc[0]
+plots = {
+    "cagr-site": mc.plot_site_growth(trajectories, site_id),
+    "spaghetti-cagr": mc.plot_trajectories(
+        trajectories, site_id, value="growth_cagr"
+    ),
+    "cagr-by-period": mc.plot_period_growth(trajectories),
+    "persistence-by-site": mc.plot_persistence(
+        trajectories, terminus=PERSISTENCE_TERMINUS
+    ),
+}
+```
+
+A single-phase settlement has one growth point, so `plot_site_growth()` skips
+it. Snapshot tables need a phase reading first: each census becomes the
+period `as_settlements()` inferred around it, and unoccupied rows are dropped.
+[`scripts/run_sampling.py`](../scripts/run_sampling.py) does that for
+Viabundus. Date methods, summary rules, and the comparison with the R samplers
+are in [Chronological sampling](chronological-sampling.md).
+
+## 8. Fit longevity to the censored draws
+
+Longevity starts from the persistence table of a sampling run. A settlement
+still occupied at the persistence terminus has a right-censored duration. The
+analysis fits a survival model to each iteration and imputes a total lifespan
+for the censored rows.
+
+```python
+samples = mc.mark_censoring(
+    mc.persistence_samples(trajectories, terminus=PERSISTENCE_TERMINUS)
+)
+fits = mc.fit_persistence(samples, distribution="gengamma")
+coefficients = fits[["mu", "sigma", "Q"]].mean()
+
+figure = mc.plot_longevity(samples, coefficients=coefficients)
+mc.save_figure(figure, output / "longevity.png")
+```
+
+`summarize_persistence()` pools that per-draw table by settlement. Leave
+`norm_pers` unchanged when imputing if the summary should keep the share from
+before imputation, which is what
+[`scripts/run_longevity.py`](../scripts/run_longevity.py) does. Families,
+censoring, and the R correspondence are in [Longevity](longevity.md).
+
+## 9. Turn the workflow into a project script
+
+Keep loading separate from the shared analyses:
 
 ```python
 def load_settlements(path):
@@ -219,10 +306,15 @@ def analyze(settlements, output):
 ```
 
 This boundary makes adding another dataset a small loader change rather than a
-copy of the analytical code. The included
-[`scripts/run_unified.py`](../scripts/run_unified.py) keeps those loaders
-outside the package and demonstrates the pattern with two adapters and one
-shared set of metrics and plots.
+copy of the analytical code. The included runners keep those loaders in
+[`scripts/run_unified.py`](../scripts/run_unified.py) and apply one analysis
+each:
+
+| Runner | Analysis | Output |
+| --- | --- | --- |
+| [`scripts/run_unified.py`](../scripts/run_unified.py) | System metrics and the seven shared plots | `figures/<dataset>/unified/` |
+| [`scripts/run_sampling.py`](../scripts/run_sampling.py) | Chronological sampling, growth, and persistence | `figures/<dataset>/sampling-python/` |
+| [`scripts/run_longevity.py`](../scripts/run_longevity.py) | Censored lifespans and imputed longevity | `figures/<dataset>/longevity-python/` |
 
 ## Assumptions to report
 
@@ -234,6 +326,8 @@ For a reproducible analysis, record:
 - source and display time scales;
 - size type, unit, and scale factor;
 - bandwidths and urban thresholds;
+- for sampling: iterations, seed, start/end/peak methods, and both termini;
+- for longevity: the survival distribution and the imputation seed;
 - ModelCity version and Python environment.
 
 See [Reproducibility](reproducibility.md) for a checklist.

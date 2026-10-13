@@ -8,10 +8,23 @@ phase bounds and carry every draw through to growth rates and persistence, so
 the spread across draws shows how much a result depends on dates the record
 does not fix.
 
-The functions live in `modelcity.sampling`, are exported from `modelcity`, and
+This is one of the three ModelCity analyses, alongside
+[system metrics](metrics-and-plots.md) and [longevity](longevity.md). The
+functions live in `modelcity.sampling`, are exported from `modelcity`, and
 reproduce [`scripts/r/sampling.R`](../scripts/r/sampling.R) and
 [`scripts/r/helpers_sampling.R`](../scripts/r/helpers_sampling.R). They need
 interval records; snapshot data is rejected.
+
+[`scripts/run_sampling.py`](../scripts/run_sampling.py) runs the analysis on
+both example datasets and writes `figures/<dataset>/sampling-python/`:
+
+```bash
+python scripts/run_sampling.py
+python scripts/run_sampling.py --dataset viabundus
+```
+
+Settings for those runs are under
+[Running on the example datasets](#running-on-the-example-datasets).
 
 ```python
 import modelcity as mc
@@ -147,8 +160,10 @@ missing.
 
 ## Longevity
 
-A settlement with `norm_pers` of 1 was still occupied at the terminus. That
-duration is right-censored. [Longevity](longevity.md) fits a survival model to
-the draws and imputes a total lifespan. The summary keeps the `norm_pers`
-from before that imputation, and `plot_longevity()` uses ggplot2's histogram
-edges.
+The persistence table is the input to the longevity analysis, the third of the
+three. A settlement with `norm_pers` of 1 was still occupied at the terminus.
+That duration is right-censored. [Longevity](longevity.md) fits a survival
+model to the draws and imputes a total lifespan.
+[`scripts/run_longevity.py`](../scripts/run_longevity.py) runs that step. The
+summary keeps the `norm_pers` from before that imputation, and
+`plot_longevity()` uses ggplot2's histogram edges.

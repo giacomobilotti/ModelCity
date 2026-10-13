@@ -1,5 +1,13 @@
 # Metrics and plots
 
+This page covers the system-level metrics and their figures: duration, events,
+churn, size, rank-size, and large-centre share.
+[`scripts/run_unified.py`](../scripts/run_unified.py) writes these figures for
+the example datasets under `figures/<dataset>/unified/`. Chronological sampling
+and longevity are the other two analyses; see
+[Chronological sampling](chronological-sampling.md) and
+[Longevity](longevity.md).
+
 ModelCity keeps numerical summaries separate from visualization. Metric
 functions return pandas DataFrames; their paired plot functions return
 Matplotlib figures.

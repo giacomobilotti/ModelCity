@@ -1,7 +1,8 @@
 # ModelCity documentation
 
 ModelCity is a dataset-agnostic Python toolkit for normalizing longitudinal
-settlement tables and applying a common set of metrics and plots.
+settlement tables and applying three shared analyses: system metrics and
+plots, chronological Monte Carlo sampling, and longevity.
 
 ## Start here
 
@@ -11,11 +12,23 @@ settlement tables and applying a common set of metrics and plots.
 - Building an analysis: [End-to-end workflow](workflow.md)
 - Library stages and functions: [Methodologies by stage](methodologies.md)
 
+## The three analyses
+
+Each analysis has a guide and a runner. The runners share the example loaders
+and write under `figures/<dataset>/`.
+
+- [Metrics and plots](metrics-and-plots.md) —
+  [`scripts/run_unified.py`](../scripts/run_unified.py) writes
+  `figures/<dataset>/unified/`.
+- [Chronological sampling](chronological-sampling.md) —
+  [`scripts/run_sampling.py`](../scripts/run_sampling.py) writes
+  `figures/<dataset>/sampling-python/`.
+- [Longevity](longevity.md) —
+  [`scripts/run_longevity.py`](../scripts/run_longevity.py) writes
+  `figures/<dataset>/longevity-python/`.
+
 ## Reference
 
-- [Metrics and plots](metrics-and-plots.md)
-- [Chronological sampling](chronological-sampling.md)
-- [Longevity](longevity.md)
 - [Python API](python-api.md)
 - [Reproducibility](reproducibility.md)
 
@@ -23,6 +36,6 @@ settlement tables and applying a common set of metrics and plots.
 
 - [Legacy R and Quarto workflows](legacy-r-workflows.md)
 
-The Yautepec and Viabundus datasets are demonstrations of the adapter pattern
-(see [`scripts/run_unified.py`](../scripts/run_unified.py)). They are not the
-organizing model for this documentation or a requirement for using the package.
+The Yautepec and Viabundus datasets demonstrate the adapter pattern used by
+all three runners. Any table that maps onto the canonical model can use the
+same analyses. The package runs on a table you supply.

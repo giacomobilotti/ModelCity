@@ -64,7 +64,10 @@ Defaults are still assumptions. Save the values used for:
 - large-centre thresholds;
 - rank-size period definitions;
 - year display;
-- output DPI and file format.
+- output DPI and file format;
+- for sampling: iterations, seed, start/end/peak methods, sampling terminus,
+  and persistence terminus;
+- for longevity: the survival distribution and the imputation seed.
 
 Prefer named constants in the analysis script:
 
@@ -92,9 +95,12 @@ The tests cover:
 - interval and snapshot normalization;
 - BP, astronomical, and BC/AD conversion;
 - duration, turnover, size, rank-size, and threshold metrics;
-- all seven plot functions for both area and population data;
+- all seven system-metric plot functions for both area and population data;
+- chronological sampling, growth summaries, and persistence;
+- longevity censoring, survival fits, and lifespan imputation;
 - integration with the included example datasets when they are available;
-- parity of KDE behavior and key time conversions with the original R work.
+- parity of KDE behavior, sampling, longevity, and key time conversions with
+  the original R work.
 
 Passing tests demonstrates that the package behaves as asserted. It does not
 validate the substantive suitability of a new dataset's mappings, periods, or
@@ -147,26 +153,32 @@ plt.close(figure)
 Tables make numerical comparison possible even when Matplotlib, fonts, or image
 metadata differ between environments.
 
-## Included reproducible demonstration
+## Included reproducible demonstrations
 
-[`scripts/run_unified.py`](../scripts/run_unified.py) loads each included
-example through a source-specific adapter (defined in that script, not in the
-package) and applies one shared set of seven plots and four exported metric
-tables:
+The three runners share source-specific adapters (defined in
+[`scripts/run_unified.py`](../scripts/run_unified.py), outside the package)
+and each applies one analysis to the included examples:
 
 ```bash
 python3 scripts/run_unified.py
-python3 scripts/run_unified.py --dataset viabundus
+python3 scripts/run_sampling.py
+python3 scripts/run_longevity.py
+python3 scripts/run_longevity.py --dataset viabundus
 ```
 
 Outputs are written under:
 
-- `figures/yautepec/unified/`;
-- `figures/viabundus/unified/`.
+- `figures/<dataset>/unified/` — system metrics, seven plots, and four tables;
+- `figures/<dataset>/sampling-python/` — chronological sampling;
+- `figures/<dataset>/longevity-python/` — longevity.
 
-This script is evidence that the same API can operate on contrasting schemas.
-It is not a generic command-line interface for arbitrary datasets; general
-projects should create a small adapter and runner as shown in the
+`run_unified.py` and `run_sampling.py` run every example dataset unless
+`--dataset` is set. `run_longevity.py` runs Yautepec unless `--dataset` names
+another survey.
+
+These scripts show that the same API can operate on contrasting schemas. They
+are example runners for the bundled datasets. A new project should create a
+small adapter and call the analyses directly, as shown in the
 [workflow guide](workflow.md).
 
 ## Suggested output manifest
@@ -182,6 +194,8 @@ mapping
 size_type_scale_and_unit
 time_scale_and_record_type
 bandwidths_and_thresholds
+sampling_iterations_seed_methods_and_termini
+longevity_distribution_and_imputation_seed
 year_display
 run_timestamp
 ```
@@ -195,7 +209,8 @@ recommended project-level practice.
 - Kernel bandwidth and large-centre thresholds require domain justification.
 - Historical BC notation and astronomical internal years differ at the
   no-year-zero boundary.
-- The package does not currently model dating uncertainty.
+- Phase bounds are taken as given. Chronological sampling draws dates inside
+  those bounds; it leaves the bounds themselves fixed.
 - Source-specific R/Quarto analyses have additional dependencies and are not
   part of the reusable Python workflow; see
   [Legacy R workflows](legacy-r-workflows.md).

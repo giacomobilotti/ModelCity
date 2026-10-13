@@ -1,10 +1,14 @@
 # Legacy R and Quarto workflows
 
 The reusable ModelCity interface is the Python package under `src/modelcity/`.
-The R runners under [`scripts/r/`](../scripts/r/) and Quarto files under
+Three runners apply that interface to the example datasets:
+[`scripts/run_unified.py`](../scripts/run_unified.py),
+[`scripts/run_sampling.py`](../scripts/run_sampling.py), and
+[`scripts/run_longevity.py`](../scripts/run_longevity.py). The R runners under
+[`scripts/r/`](../scripts/r/) and Quarto files under
 [`notebooks/`](../notebooks/) are dataset-specific project analyses. They are
-retained for provenance and for figures that are outside the shared Python
-metric set.
+retained for provenance and for figures that sit outside those three Python
+analyses, such as maps, alluvial diagrams, and Sankey figures.
 
 They should not be used as templates for adapting a new dataset.
 
@@ -86,10 +90,12 @@ Some R calculations motivated or validate shared Python behavior, including:
 - settlement duration, event, turnover, size, rank-size, and threshold
   summaries.
 
-The Python demonstration runner
-[`scripts/run_unified.py`](../scripts/run_unified.py) is the maintained example
-of applying one common analysis to different schemas. R-only maps, alluvial
-diagrams, Sankey figures, and paper-specific models are not currently part of
+The three Python runners are the maintained examples of applying the shared
+analyses to different schemas: system metrics in
+[`scripts/run_unified.py`](../scripts/run_unified.py), chronological sampling
+in [`scripts/run_sampling.py`](../scripts/run_sampling.py), and longevity in
+[`scripts/run_longevity.py`](../scripts/run_longevity.py). R-only maps,
+alluvial diagrams, Sankey figures, and paper-specific models remain outside
 the general Python API.
 
 For a new dataset, begin with [Adapting a new dataset](adapting-datasets.md),

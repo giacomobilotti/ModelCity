@@ -5,12 +5,15 @@ package; everything below is the shared library path after you have a pandas
 DataFrame.
 
 ```text
-Data preparation  →  Analysis  →  Visualisation  →  Output
-     (normalize)      (tables)      (figures)       (save / labels)
+Data preparation  →  one or more analyses  →  Visualisation  →  Output
+     (normalize)       ├── system metrics
+                       ├── chronological sampling
+                       └── longevity
 ```
 
-For formulas, caveats, and bandwidth guidance, see
-[Metrics and plots](metrics-and-plots.md) and the
+For formulas and caveats, see [Metrics and plots](metrics-and-plots.md),
+[Chronological sampling](chronological-sampling.md),
+[Longevity](longevity.md), and the
 [Canonical data model](data-model.md). This page is the inventory of public
 functions and the stage each belongs to.
 
@@ -20,7 +23,7 @@ functions and the stage each belongs to.
 | --- | --- | --- | --- |
 | Data preparation | Map columns, scale size, normalise time, build a canonical table | `DataFrame` + role mapping | `Settlements` |
 | Time helpers | Convert and label years; infer snapshot interval bounds | year values / display choice | arrays, strings, bounds |
-| Analysis | Compute summaries used for comparison across datasets | `Settlements` | pandas `DataFrame` |
+| System metrics | Durations, events, churn, size, rank-size, and large-centre share | `Settlements` | pandas `DataFrame` |
 | Chronological sampling | Draw dates inside phase bounds and carry them through growth and persistence | interval `Settlements` | trajectory and summary tables |
 | Longevity | Fit censored lifespans and impute a total duration past the terminus | persistence samples | survival fits and an imputed summary |
 | Visualisation | Render analysis results as figures | `Settlements` or a result table | Matplotlib `Figure` |
@@ -47,8 +50,9 @@ They do not compute research summaries.
 | `SIZE_TYPES` | Allowed size semantics: `area` and `population`. |
 
 **Stage note.** Calling `as_settlements()` is the only required library step before
-analysis. Dataset adapters (for example in `scripts/run_unified.py`) belong
-upstream of this stage.
+any of the three analyses. Dataset adapters (for example in
+`scripts/run_unified.py`, which the sampling and longevity runners import)
+belong upstream of this stage.
 
 ---
 
@@ -73,10 +77,14 @@ midpoints between sorted years, with outer half-gap extension.
 
 ---
 
-## Analysis
+## System metrics
 
-Metric functions return pandas DataFrames. All settlement- and period-level
-metrics keep only rows with `size > 0` (zero means unoccupied).
+These functions summarise the settlement system from the canonical table. They
+return pandas DataFrames. All settlement- and period-level metrics keep only
+rows with `size > 0` (zero means unoccupied).
+[`scripts/run_unified.py`](../scripts/run_unified.py) runs them, and the
+matching plots, on both example datasets. See
+[Metrics and plots](metrics-and-plots.md).
 
 | Function | What it does |
 | --- | --- |
@@ -97,12 +105,13 @@ Default urban thresholds come from `SizeSpec`: 20 and 40 ha for area data, or
 
 ---
 
-## Chronological sampling and longevity
+## Chronological sampling
 
-Both stages need interval records. Sampling draws foundation, peak and
-abandonment dates inside the phase bounds. Longevity starts from the resulting
-persistence table and treats a settlement still occupied at the terminus as
-right-censored.
+Sampling needs interval records. It draws foundation, peak, and abandonment
+dates inside the phase bounds and carries each draw through size, growth, and
+persistence. [`scripts/run_sampling.py`](../scripts/run_sampling.py) runs this
+analysis on both example datasets. See
+[Chronological sampling](chronological-sampling.md).
 
 | Function | What it does |
 | --- | --- |
@@ -110,25 +119,36 @@ right-censored.
 | `site_summary(trajectories)`, `period_summary(trajectories)` | Growth summaries by settlement and by phase. |
 | `persistence_samples(trajectories, terminus)` | Lifespan of each settlement in each draw, up to `terminus`. |
 | `persistence_summary(trajectories, terminus)` | Spread of those lifespans. Recomputes them from the dates. |
+
+`plot_site_growth`, `plot_trajectories`, `plot_period_growth`, and
+`plot_persistence` draw these results.
+
+## Longevity
+
+Longevity starts from the persistence table produced by sampling. A settlement
+still occupied at the terminus is right-censored. The fit imputes a total
+lifespan past that date. [`scripts/run_longevity.py`](../scripts/run_longevity.py)
+runs this analysis on the example datasets. See [Longevity](longevity.md).
+
+| Function | What it does |
+| --- | --- |
 | `mark_censoring(samples)` | `event` 0 when `norm_pers` is 1, otherwise 1. |
 | `fit_survival(...)`, `compare_survival(...)` | Parametric survival fits and their AIC ranking. |
 | `fit_persistence(samples, distribution="gengamma")` | One fit per Monte Carlo iteration. |
 | `impute_lifespan(longevity, mu, sigma, q, seed=1234)` | Total generalised-gamma lifespan, conditional on the observed duration. |
 | `summarize_persistence(samples)` | Year columns from the persistence in the table. The share columns average the stored `norm_pers`. |
 
-The rules, parameterisations and differences from R are in
-[Chronological sampling](chronological-sampling.md) and
-[Longevity](longevity.md). `plot_site_growth`, `plot_trajectories`,
-`plot_period_growth`, `plot_persistence` and `plot_longevity` draw these
-results.
+`plot_longevity` draws the per-draw durations, with an optional
+generalised-gamma density.
 
 ---
 
 ## Visualisation
 
-Plot functions call the matching analysis routine and return a Matplotlib
-figure. They do not change the underlying numbers except for presentation
-choices (titles, dual axes, optional log scale, peak markers).
+System-metric plots call the matching analysis routine. Sampling and longevity
+plots take the trajectory or persistence table already computed. Every plot
+returns a Matplotlib figure. Presentation choices (titles, dual axes, optional
+log scale, peak markers) are the only changes to the underlying numbers.
 
 | Function | What it does | Analysis it uses |
 | --- | --- | --- |
@@ -139,6 +159,11 @@ choices (titles, dual axes, optional log scale, peak markers).
 | `plot_size_summary(...)` | Median, mean, percentile band, and maximum size by period. | `size_summary` |
 | `plot_rank_size(...)` | Rank–size panels per period with Zipf reference line. | `rank_size` |
 | `plot_urban_share(...)` | Large-centre absolute size and percent share by period. | `urban_share` |
+| `plot_site_growth(...)` | Growth-rate bands for one settlement across draws. | trajectory frame |
+| `plot_trajectories(...)` | A sample of one settlement's drawn paths. | trajectory frame |
+| `plot_period_growth(...)` | Growth by phase across draws. | trajectory frame |
+| `plot_persistence(...)` | Persistence by settlement across draws. | trajectory frame and a terminus |
+| `plot_longevity(...)` | Density histogram of sampled durations, with an optional generalised-gamma curve. | persistence samples |
 
 **Stage note.** Wording (“site” vs “city”) follows `size_type`. Year axis labels
 follow the current year-display setting; duration plots use elapsed years and
@@ -162,10 +187,16 @@ astronomical where conversion applied.
 
 1. **Prepare:** map your table with `as_settlements(...)`.
 2. **Inspect:** print the `Settlements` object; check `size_type`, periods, and record type.
-3. **Analyse:** call the metric functions you need; keep the DataFrames for tables or checks.
-4. **Visualise:** call the matching `plot_*` functions.
-5. **Output:** `save_figure(...)`; optionally export metric tables with `DataFrame.to_csv`.
+3. **Analyse.** Run one or more of the three analyses, and keep the DataFrames:
+   - system metrics on any record type;
+   - chronological sampling on interval records;
+   - longevity on the persistence table from a sampling run.
+4. **Visualise:** call the `plot_*` function that matches the table you just computed.
+5. **Output:** `save_figure(...)`; optionally export tables with `DataFrame.to_csv`.
 
-The demonstration runner [`scripts/run_unified.py`](../scripts/run_unified.py)
-follows that order after its script-local adapters produce `Settlements`
-objects.
+Three runners follow that order after the adapters in
+[`scripts/run_unified.py`](../scripts/run_unified.py) produce `Settlements`
+objects: [`scripts/run_unified.py`](../scripts/run_unified.py) for system
+metrics, [`scripts/run_sampling.py`](../scripts/run_sampling.py) for
+chronological sampling, and
+[`scripts/run_longevity.py`](../scripts/run_longevity.py) for longevity.

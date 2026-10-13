@@ -237,7 +237,9 @@ R-exported CSV, parses coordinates, optionally converts them with `pyproj`
 same `as_settlements()` constructor.
 
 These adapters illustrate the pattern; neither schema is privileged by the
-core package.
+core package. The sampling and longevity runners import them and then run
+their own analyses.
 
-After adapting a source, follow the [end-to-end workflow](workflow.md) and the
-[reproducibility checklist](reproducibility.md).
+After adapting a source, follow the [end-to-end workflow](workflow.md). That
+path covers system metrics, chronological sampling, and longevity. Also keep
+the [reproducibility checklist](reproducibility.md).

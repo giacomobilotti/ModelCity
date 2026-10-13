@@ -2,8 +2,9 @@
 
 ModelCity is a Python toolkit for comparing how settlement systems change over
 long periods of time. It maps differently structured tables onto one canonical
-data model, then applies the same metrics and plots whether settlement size is
-recorded as occupied area or population.
+data model, then applies the same three analyses whether settlement size is
+recorded as occupied area or population: system metrics and plots, chronological
+Monte Carlo sampling, and longevity.
 
 The package is dataset-agnostic. The Yautepec and Viabundus files in this
 repository are worked examples, not requirements.
@@ -17,9 +18,21 @@ Mechanisms of Long-term Urban Evolution and Resilience* (PI: Iza Romanowska).
 your DataFrame
     → map id, size, and time columns
     → canonical Settlements object
-    → durations, events, churn, size summaries, rank-size, and urban share
+         ├── system metrics and plots
+         ├── chronological sampling
+         └── longevity
     → pandas tables and Matplotlib figures
 ```
+
+The three analyses share that object:
+
+- **System metrics and plots** summarise duration, foundations and
+  abandonments, churn, size, rank-size, and large-centre share.
+- **Chronological sampling** draws foundation, peak, and abandonment dates
+  inside phase bounds and carries each draw through growth and persistence.
+- **Longevity** treats a settlement still occupied at the end of the record as
+  right-censored, fits a survival model to the sampled durations, and imputes
+  a total lifespan.
 
 ModelCity supports:
 
@@ -48,8 +61,9 @@ Install the test tools with:
 python3 -m pip install -e ".[dev]"
 ```
 
-The optional `geo` extra installs `pyproj`, which the Viabundus demo loader in
-`scripts/run_unified.py` uses for region assignment:
+The optional `geo` extra installs `pyproj`, which the Viabundus loader in
+`scripts/run_unified.py` uses for region assignment. The sampling and
+longevity runners import that loader:
 
 ```bash
 python3 -m pip install -e ".[dev,geo]"
@@ -118,9 +132,9 @@ See [Adapting datasets](docs/adapting-datasets.md) for complete mapping recipes.
 - [Canonical data model](docs/data-model.md)
 - [End-to-end workflow](docs/workflow.md)
 - [Methodologies by stage](docs/methodologies.md)
-- [Metrics and plots](docs/metrics-and-plots.md)
-- [Chronological sampling](docs/chronological-sampling.md)
-- [Longevity](docs/longevity.md)
+- [Metrics and plots](docs/metrics-and-plots.md) (`scripts/run_unified.py`)
+- [Chronological sampling](docs/chronological-sampling.md) (`scripts/run_sampling.py`)
+- [Longevity](docs/longevity.md) (`scripts/run_longevity.py`)
 - [Adapting new datasets](docs/adapting-datasets.md)
 - [Python API](docs/python-api.md)
 - [Reproducibility](docs/reproducibility.md)
@@ -129,16 +143,26 @@ See [Adapting datasets](docs/adapting-datasets.md) for complete mapping recipes.
 ## Included demonstrations
 
 Source-specific loaders for the example CSVs live in
-[`scripts/run_unified.py`](scripts/run_unified.py), not in the package. They
-map each table through `as_settlements()`, then the script applies the same
-seven plotting calls to both datasets.
+[`scripts/run_unified.py`](scripts/run_unified.py), outside the package. The
+sampling and longevity runners import those loaders. Each runner then applies
+one of the three analyses:
+
+| Runner | Analysis | Output |
+| --- | --- | --- |
+| [`scripts/run_unified.py`](scripts/run_unified.py) | System metrics and plots | `figures/<dataset>/unified/` |
+| [`scripts/run_sampling.py`](scripts/run_sampling.py) | Chronological sampling | `figures/<dataset>/sampling-python/` |
+| [`scripts/run_longevity.py`](scripts/run_longevity.py) | Longevity | `figures/<dataset>/longevity-python/` |
 
 ```bash
 python3 scripts/run_unified.py
-python3 scripts/run_unified.py --dataset yautepec
+python3 scripts/run_sampling.py
+python3 scripts/run_longevity.py
+python3 scripts/run_longevity.py --dataset viabundus
 ```
 
-Figures and tables are written under `figures/<dataset>/unified/`.
+`run_unified.py` and `run_sampling.py` run every example dataset unless
+`--dataset` is set. `run_longevity.py` runs Yautepec unless `--dataset` names
+another survey. Pass `--dataset` to any of them to select one survey.
 
 ## Repository layout
 
@@ -147,9 +171,9 @@ src/modelcity/        reusable Python package
 tests/                unit and integration tests
 docs/                 user and developer guides
 data/examples/         included example datasets
-scripts/               Python runner and dataset-specific R runners
+scripts/               runners for the three analyses, plus dataset-specific R runners
 notebooks/             project-specific Quarto analyses
-figures/<dataset>/     unified and project-analysis outputs
+figures/<dataset>/     unified, sampling, longevity, and project-analysis outputs
 ```
 
 ## Testing

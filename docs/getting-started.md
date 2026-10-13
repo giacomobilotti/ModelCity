@@ -16,8 +16,9 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-The optional `geo` extra installs `pyproj`, which the Viabundus demo loader in
-`scripts/run_unified.py` uses when assigning regions from projected coordinates:
+The optional `geo` extra installs `pyproj`, which the Viabundus loader in
+`scripts/run_unified.py` uses when assigning regions from projected coordinates.
+The sampling and longevity runners import that loader.
 
 ```bash
 python -m pip install -e ".[dev,geo]"
@@ -130,9 +131,26 @@ with mc.year_display("BCAD"):
 Use `mc.set_year_display("BCAD")` to change labels globally and
 `mc.set_year_display("BP")` to restore the default.
 
+## The three analyses
+
+The figure above is the system-metrics analysis. The same `Settlements` object
+feeds chronological sampling and, through those persistence draws, longevity.
+This guide stops at one metric plot. The three runners show each analysis on
+the example datasets:
+
+```bash
+python scripts/run_unified.py
+python scripts/run_sampling.py
+python scripts/run_longevity.py
+```
+
+`run_longevity.py` runs Yautepec unless you pass `--dataset viabundus`.
+
 ## Next steps
 
 - Understand the [canonical data model](data-model.md).
 - Follow the complete [analysis workflow](workflow.md).
 - Learn how to [adapt another dataset](adapting-datasets.md).
-- Choose from the available [metrics and plots](metrics-and-plots.md).
+- Read [metrics and plots](metrics-and-plots.md),
+  [chronological sampling](chronological-sampling.md), and
+  [longevity](longevity.md).

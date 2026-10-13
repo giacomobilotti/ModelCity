@@ -1,7 +1,8 @@
 # Python API
 
-This page summarizes the supported top-level API. Import these names from
-`modelcity`; submodule helpers not re-exported by
+This page summarizes the supported top-level API. The public surface covers
+construction, system metrics and plots, chronological sampling, and longevity.
+Import these names from `modelcity`; submodule helpers not re-exported by
 [`src/modelcity/__init__.py`](../src/modelcity/__init__.py) should be treated as
 internal unless documented otherwise.
 
@@ -73,9 +74,11 @@ Properties and methods:
 - `ALL_ROLES`: required and optional roles together.
 
 Source-specific adapters for the repository example CSVs live in
-[`scripts/run_unified.py`](../scripts/run_unified.py), not in the package API.
-New datasets should use `as_settlements()` directly or define a similarly thin
-adapter outside the library.
+[`scripts/run_unified.py`](../scripts/run_unified.py), outside the package API.
+[`scripts/run_sampling.py`](../scripts/run_sampling.py) and
+[`scripts/run_longevity.py`](../scripts/run_longevity.py) import those
+adapters. New datasets should use `as_settlements()` directly or define a
+similarly thin adapter outside the library.
 
 ## Metrics
 
@@ -94,10 +97,12 @@ See [Metrics and plots](metrics-and-plots.md) for outputs and interpretation.
 With no occupied rows, `urban_share()` currently returns a columnless frame and
 `plot_urban_share()` cannot render it.
 
-## Plots
+## System metric plots
 
-All plot functions in this section accept a `Settlements` object as their first
-argument and return a `matplotlib.figure.Figure`.
+The plot functions in this section accept a `Settlements` object as their first
+argument and return a `matplotlib.figure.Figure`. Sampling and longevity plots
+are listed with those analyses below. [`scripts/run_unified.py`](../scripts/run_unified.py)
+writes this set.
 
 - `plot_duration(settlements, bw=150.0, mark_peaks=True, figsize=(10, 7.5))`;
 - `plot_events(settlements, bw=150.0, figsize=(10, 7.5))`;
